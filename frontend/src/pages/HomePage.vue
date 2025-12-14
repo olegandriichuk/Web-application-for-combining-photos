@@ -6,10 +6,50 @@
         <span class="spark">✦</span>
       </div>
 
-      <h1 class="hero-title">Image Blend Generator</h1>
-      <p class="hero-subtitle">Upload 4–6 images to create a beautiful blended composition</p>
+      <h1 class="hero-title">Image Stitch Generator</h1>
+      <p class="hero-subtitle">Upload  images to create  stitched composition</p>
     </div>
 
+    <!-- TOP: Uploaded photos OR empty text -->
+    <div class="gallery card" v-if="photos.length > 0">
+      <div class="card-head">
+        <h2 class="card-title">Uploaded Images</h2>
+        <p class="card-subtitle">
+  {{ photos.length }}
+  {{ photos.length === 1 ? 'image ready to stitch' : 'images ready to stitch' }}
+</p>
+
+      </div>
+
+    <div class="photos-scroll">
+      <div class="photos-grid">
+        <article v-for="(p, idx) in photos" :key="p.id" class="photo-tile">
+          <a :href="photoUrl(p.id)" target="_blank" rel="noopener" class="tile-link">
+            <img :src="photoUrl(p.id)" :alt="p.original_name" class="tile-img" />
+          </a>
+
+          <div class="tile-badge">{{ idx + 1 }}</div>
+
+          <button
+            class="tile-close"
+            type="button"
+            title="Delete"
+            @click="onDelete(p.id)"
+          >
+            ×
+          </button>
+        </article>
+      </div>
+    </div>
+
+
+    </div>
+
+    <div class="card empty-state" v-else>
+      <div class="empty-state-text">Upload images to start stitching</div>
+    </div>
+
+    <!-- BOTTOM: Upload -->
     <div class="card">
       <div class="card-head">
         <h2 class="card-title">Upload Your Images</h2>
@@ -58,7 +98,7 @@
           :disabled="isLoading || selectedCount < 4"
         >
           <span class="btn-spark" aria-hidden="true">✦</span>
-          Generate Blended Image
+          Generate Stitched Image
         </button>
 
         <p class="hint" v-if="selectedCount < 4">
@@ -66,47 +106,9 @@
         </p>
       </div>
     </div>
-
-    <!-- (опційно) превʼю галереї нижче — залишив твою існуючу сітку -->
-    <div class="gallery card" v-if="photos.length > 0">
-      <div class="card-head">
-        <h2 class="card-title">Gallery</h2>
-        <p class="card-subtitle">{{ photos.length }} photos</p>
-      </div>
-
-      <div class="photos-grid">
-        <article v-for="p in photos" :key="p.id" class="photo-card">
-          <a :href="photoUrl(p.id)" target="_blank" rel="noopener" class="photo-link">
-            <img :src="photoUrl(p.id)" :alt="p.original_name" class="photo-img" />
-            <div class="photo-overlay"><span class="view-icon">👁️</span></div>
-          </a>
-
-          <div class="photo-meta">
-            <div class="photo-name" :title="p.original_name">{{ p.original_name }}</div>
-            <div class="photo-info">
-              {{ (p.size / 1024).toFixed(1) }} KB • {{ formatDate(p.created_at) }}
-            </div>
-          </div>
-
-          <div class="photo-actions">
-            <a
-              :href="photoUrl(p.id)"
-              :download="p.original_name"
-              class="photo-action-btn download"
-              title="Download"
-            >⬇️</a>
-
-            <button
-              @click="onDelete(p.id)"
-              class="photo-action-btn delete"
-              title="Delete"
-            >🗑️</button>
-          </div>
-        </article>
-      </div>
-    </div>
   </div>
 </template>
+
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
@@ -131,7 +133,9 @@ const refresh = async () => {
   isLoading.value = true
   error.value = null
   try {
-    photos.value = await apiListPhotos(100, 0)
+    const list = await apiListPhotos(100, 0)
+    // щоб нові фото додавались в кінець, а не на початок
+    photos.value = [...list].reverse()
   } catch (e: any) {
     console.error(e)
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to load photos'
@@ -182,17 +186,7 @@ const onDelete = async (id: string) => {
   }
 }
 
-const formatDate = (iso?: string) => {
-  if (!iso) return ''
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString()
-  } catch {
-    return iso
-  }
-}
 
-// Drag & drop тільки для стилю/UX (без нових файлів)
 const onDragEnter = () => { if (!isLoading.value) isDragActive.value = true }
 const onDragOver = () => { if (!isLoading.value) isDragActive.value = true }
 const onDragLeave = () => { isDragActive.value = false }
