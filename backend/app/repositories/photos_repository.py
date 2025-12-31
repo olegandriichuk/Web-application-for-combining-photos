@@ -7,14 +7,14 @@ async def create_photo_meta(
     session: AsyncSession,
     *,
     id: str,
-    stored_name: str,
+    s3_key: str,
     original_name: str,
     mime: str,
     size: int,
 ) -> Photo:
     obj = Photo(
         id=id,
-        stored_name=stored_name,
+        s3_key=s3_key,
         original_name=original_name,
         mime=mime,
         size=size,

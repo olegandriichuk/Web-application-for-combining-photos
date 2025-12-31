@@ -1,11 +1,10 @@
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, Base
 from .routers import items, photos
-from .models import photo as _photo  
-from .models import item as _item   
+from .models import photo as _photo
+from .models import item as _item
 
 app = FastAPI(
     title="API (async, SQLite)",
@@ -25,12 +24,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
-    
+    # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    
-    os.makedirs(os.path.join(os.getcwd(), "data", "photos"), exist_ok=True)
 
 
 app.include_router(items.router)  

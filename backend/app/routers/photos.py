@@ -1,19 +1,17 @@
 import os
 import uuid
 from typing import List
+from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-import aiofiles
 
 from ..database import get_db
 from ..repositories import photos_repository as repo
+from ..services.s3_service import s3_service
 
 router = APIRouter()
-
-STORAGE_DIR = os.path.join(os.getcwd(), "data", "photos")
-os.makedirs(STORAGE_DIR, exist_ok=True)
 
 def _safe_ext(name: str | None) -> str:
     if not name:
@@ -33,26 +31,32 @@ async def upload_photos(
     for f in files:
         fid = str(uuid.uuid4())
         ext = _safe_ext(f.filename)
-        stored_name = f"{fid}{ext}"
-        stored_path = os.path.join(STORAGE_DIR, stored_name)
+        s3_key = f"photos/{fid}{ext}"
 
-        # async file write
-        async with aiofiles.open(stored_path, "wb") as out:
-            while True:
-                chunk = await f.read(1024 * 1024)
-                if not chunk:
-                    break
-                await out.write(chunk)
+        # Read file content
+        file_content = await f.read()
+        file_size = len(file_content)
 
-        size = os.path.getsize(stored_path)
+        # Upload to S3
+        try:
+            await s3_service.upload_file(
+                file_data=file_content,
+                s3_key=s3_key,
+                content_type=f.content_type or "application/octet-stream",
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to upload file to S3: {str(e)}"
+            )
 
+        # Save metadata to database
         await repo.create_photo_meta(
             session,
             id=fid,
-            stored_name=stored_name,
-            original_name=f.filename or stored_name,
+            s3_key=s3_key,
+            original_name=f.filename or f"{fid}{ext}",
             mime=f.content_type or "application/octet-stream",
-            size=size,
+            size=file_size,
         )
         ids.append(fid)
 
@@ -86,11 +90,20 @@ async def get_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    path = os.path.join(STORAGE_DIR, row.stored_name)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=410, detail="File is missing on disk")
+    # Download from S3
+    try:
+        file_data = await s3_service.download_file(row.s3_key)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to download file from S3: {str(e)}"
+        )
 
-    return FileResponse(path, media_type=row.mime, filename=row.original_name)
+    # Return as streaming response
+    return StreamingResponse(
+        BytesIO(file_data),
+        media_type=row.mime,
+        headers={"Content-Disposition": f'inline; filename="{row.original_name}"'},
+    )
 
 @router.delete("/{photo_id}", summary="Delete photo")
 async def delete_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
@@ -98,13 +111,14 @@ async def delete_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    path = os.path.join(STORAGE_DIR, row.stored_name)
+    # Delete from S3
     try:
-        if os.path.exists(path):
-            os.remove(path)
+        await s3_service.delete_file(row.s3_key)
     except Exception:
+        # Continue even if S3 deletion fails
         pass
 
+    # Delete from database
     await repo.delete_photo(session, row)
     await session.commit()
     return {"ok": True, "id": photo_id}
