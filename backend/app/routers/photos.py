@@ -21,13 +21,13 @@ def _safe_ext(name: str | None) -> str:
     _, ext = os.path.splitext(name)
     return ext if 0 < len(ext) <= 10 else ""
 
-@router.post("", summary="Завантажити фото")
+@router.post("", summary="Upload photos")
 async def upload_photos(
     files: List[UploadFile] = File(...),
     session: AsyncSession = Depends(get_db),
 ):
     if not files:
-        raise HTTPException(status_code=400, detail="Немає файлів")
+        raise HTTPException(status_code=400, detail="No files provided")
 
     ids: List[str] = []
     for f in files:
@@ -36,7 +36,7 @@ async def upload_photos(
         stored_name = f"{fid}{ext}"
         stored_path = os.path.join(STORAGE_DIR, stored_name)
 
-        # асинхронний запис файлу
+        # async file write
         async with aiofiles.open(stored_path, "wb") as out:
             while True:
                 chunk = await f.read(1024 * 1024)
@@ -59,7 +59,7 @@ async def upload_photos(
     await session.commit()
     return {"items": ids}
 
-@router.get("", summary="Список фото")
+@router.get("", summary="List photos")
 async def list_photos(
     limit: int = 100,
     offset: int = 0,
@@ -72,29 +72,31 @@ async def list_photos(
             "original_name": r.original_name,
             "mime": r.mime,
             "size": r.size,
-            "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
+            "created_at": r.created_at.isoformat()
+            if hasattr(r.created_at, "isoformat")
+            else str(r.created_at),
         }
         for r in rows
     ]
     return {"items": items}
 
-@router.get("/{photo_id}", summary="Переглянути/скачати фото")
+@router.get("/{photo_id}", summary="View / download photo")
 async def get_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
     row = await repo.get_photo(session, photo_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Фото не знайдено")
+        raise HTTPException(status_code=404, detail="Photo not found")
 
     path = os.path.join(STORAGE_DIR, row.stored_name)
     if not os.path.exists(path):
-        raise HTTPException(status_code=410, detail="Файл відсутній на диску")
+        raise HTTPException(status_code=410, detail="File is missing on disk")
 
     return FileResponse(path, media_type=row.mime, filename=row.original_name)
 
-@router.delete("/{photo_id}", summary="Видалити фото")
+@router.delete("/{photo_id}", summary="Delete photo")
 async def delete_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
     row = await repo.get_photo(session, photo_id)
     if not row:
-        raise HTTPException(status_code=404, detail="Фото не знайдено")
+        raise HTTPException(status_code=404, detail="Photo not found")
 
     path = os.path.join(STORAGE_DIR, row.stored_name)
     try:
