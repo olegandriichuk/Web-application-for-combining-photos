@@ -1,6 +1,8 @@
 # Environment variables with secrets
 .env
 backend/.env
+aws.txt
+**/aws*.txt
 
 # Python
 __pycache__/
