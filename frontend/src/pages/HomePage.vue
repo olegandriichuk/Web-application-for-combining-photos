@@ -24,8 +24,8 @@
     <div class="photos-scroll">
       <div class="photos-grid">
         <article v-for="(p, idx) in photos" :key="p.id" class="photo-tile">
-          <a :href="photoUrl(p.id)" target="_blank" rel="noopener" class="tile-link">
-            <img :src="photoUrl(p.id)" :alt="p.original_name" class="tile-img" />
+          <a :href="getPhotoUrl(p.id)" target="_blank" rel="noopener" class="tile-link">
+            <img :src="getPhotoUrl(p.id)" :alt="p.original_name" class="tile-img" />
           </a>
 
           <div class="tile-badge">{{ idx + 1 }}</div>
@@ -111,7 +111,7 @@
 
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import './HomePage.css'
 
 import {
@@ -119,15 +119,32 @@ import {
   uploadPhotos as apiUploadPhotos,
   deletePhoto as apiDeletePhoto,
   photoUrl,
+  fetchPhotoBlob,
   type PhotoItem,
 } from '../api/photos'
 
 const photos = ref<PhotoItem[]>([])
+const photoBlobUrls = ref<Record<string, string>>({})
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
 const selectedCount = ref(0)
 const isDragActive = ref(false)
+
+const getPhotoUrl = (id: string): string => {
+  return photoBlobUrls.value[id] || ''
+}
+
+const loadPhotoBlobs = async (photoList: PhotoItem[]) => {
+  // Fetch blob URLs for all photos
+  for (const photo of photoList) {
+    try {
+      photoBlobUrls.value[photo.id] = await fetchPhotoBlob(photo.id)
+    } catch (e) {
+      console.error(`Failed to load photo ${photo.id}:`, e)
+    }
+  }
+}
 
 const refresh = async () => {
   isLoading.value = true
@@ -136,6 +153,8 @@ const refresh = async () => {
     const list = await apiListPhotos(100, 0)
     // щоб нові фото додавались в кінець, а не на початок
     photos.value = [...list].reverse()
+    // Load blob URLs for authenticated access
+    await loadPhotoBlobs(photos.value)
   } catch (e: any) {
     console.error(e)
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to load photos'
@@ -143,6 +162,11 @@ const refresh = async () => {
     isLoading.value = false
   }
 }
+
+// Clean up blob URLs when component unmounts
+onBeforeUnmount(() => {
+  Object.values(photoBlobUrls.value).forEach(url => URL.revokeObjectURL(url))
+})
 
 const uploadFiles = async (files: File[]) => {
   if (!files.length) return

@@ -28,6 +28,14 @@ export const photoUrl = (id: string) => {
   return `${api.defaults.baseURL}/photos/${id}`;
 };
 
+export const fetchPhotoBlob = async (id: string): Promise<string> => {
+  // Fetch photo with authentication, return object URL
+  const resp = await api.get(`/photos/${id}`, {
+    responseType: 'blob'
+  });
+  return URL.createObjectURL(resp.data);
+};
+
 export const deletePhoto = async (id: string) => {
   const resp = await api.delete(`/photos/${id}`);
   return resp.data;

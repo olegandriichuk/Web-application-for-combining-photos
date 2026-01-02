@@ -11,6 +11,7 @@ async def create_photo_meta(
     original_name: str,
     mime: str,
     size: int,
+    user_id: str,
 ) -> Photo:
     obj = Photo(
         id=id,
@@ -18,6 +19,7 @@ async def create_photo_meta(
         original_name=original_name,
         mime=mime,
         size=size,
+        user_id=user_id,
     )
     session.add(obj)
     await session.flush()
@@ -29,11 +31,13 @@ async def get_photo(session: AsyncSession, photo_id: str) -> Optional[Photo]:
 async def list_photos(
     session: AsyncSession,
     *,
+    user_id: str,
     limit: int = 100,
     offset: int = 0,
 ) -> List[Photo]:
     stmt = (
         select(Photo)
+        .where(Photo.user_id == user_id)
         .order_by(Photo.created_at.desc())
         .limit(limit)
         .offset(offset)

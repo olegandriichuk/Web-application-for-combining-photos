@@ -1,5 +1,6 @@
 import os
 import uuid
+import asyncio
 from typing import List
 from io import BytesIO
 
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..repositories import photos_repository as repo
 from ..services.s3_service import s3_service
+from ..dependencies.auth import get_current_user
+from ..models.user import User
 
 router = APIRouter()
 
@@ -23,12 +26,13 @@ def _safe_ext(name: str | None) -> str:
 async def upload_photos(
     files: List[UploadFile] = File(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
-    ids: List[str] = []
-    for f in files:
+    async def process_single_file(f: UploadFile):
+        """Process a single file upload"""
         fid = str(uuid.uuid4())
         ext = _safe_ext(f.filename)
         s3_key = f"photos/{fid}{ext}"
@@ -57,19 +61,25 @@ async def upload_photos(
             original_name=f.filename or f"{fid}{ext}",
             mime=f.content_type or "application/octet-stream",
             size=file_size,
+            user_id=current_user.id,
         )
-        ids.append(fid)
+
+        return fid
+
+    # Process all files in parallel
+    ids = await asyncio.gather(*[process_single_file(f) for f in files])
 
     await session.commit()
-    return {"items": ids}
+    return {"items": list(ids)}
 
 @router.get("", summary="List photos")
 async def list_photos(
     limit: int = 100,
     offset: int = 0,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    rows = await repo.list_photos(session, limit=limit, offset=offset)
+    rows = await repo.list_photos(session, user_id=current_user.id, limit=limit, offset=offset)
     items = [
         {
             "id": r.id,
@@ -85,10 +95,17 @@ async def list_photos(
     return {"items": items}
 
 @router.get("/{photo_id}", summary="View / download photo")
-async def get_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
+async def get_photo(
+    photo_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     row = await repo.get_photo(session, photo_id)
     if not row:
         raise HTTPException(status_code=404, detail="Photo not found")
+
+    if row.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Download from S3
     try:
@@ -106,10 +123,17 @@ async def get_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
     )
 
 @router.delete("/{photo_id}", summary="Delete photo")
-async def delete_photo(photo_id: str, session: AsyncSession = Depends(get_db)):
+async def delete_photo(
+    photo_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     row = await repo.get_photo(session, photo_id)
     if not row:
         raise HTTPException(status_code=404, detail="Photo not found")
+
+    if row.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Delete from S3
     try:
