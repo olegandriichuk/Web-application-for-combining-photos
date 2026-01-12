@@ -13,6 +13,7 @@ from ..utils.auth import (
 )
 from ..dependencies.auth import get_current_user
 from ..models.user import User
+from ..services.deletion_service import deletion_service
 
 router = APIRouter()
 
@@ -64,3 +65,13 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     return current_user
+
+
+@router.delete("/me")
+async def delete_current_user(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete the current user and all their projects/photos (DB + S3)"""
+    await deletion_service.delete_user(session, current_user)
+    return {"ok": True, "id": current_user.id}

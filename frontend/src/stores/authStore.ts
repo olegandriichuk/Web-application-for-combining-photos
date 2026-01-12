@@ -1,11 +1,5 @@
 import { reactive, computed } from 'vue'
-
-interface User {
-  id: string
-  name: string
-  email: string
-  created_at: string
-}
+import type { User } from '../types/auth'
 
 interface AuthState {
   token: string | null

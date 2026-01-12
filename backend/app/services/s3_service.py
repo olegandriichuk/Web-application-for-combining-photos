@@ -108,6 +108,54 @@ class S3Service:
             logger.error(f"Failed to delete file from S3: {e}")
             raise Exception(f"S3 deletion failed: {str(e)}")
 
+    async def delete_files(self, s3_keys: list[str]) -> dict:
+        """
+        Delete multiple files from S3 in a single batch request.
+        S3 allows up to 1000 keys per batch delete.
+
+        Args:
+            s3_keys: List of S3 keys to delete
+
+        Returns:
+            dict with 'deleted' (list of keys) and 'errors' (list of failed keys)
+        """
+        if not s3_keys:
+            return {"deleted": [], "errors": []}
+
+        results = {"deleted": [], "errors": []}
+
+        try:
+            async with self.session.client(
+                "s3", endpoint_url=self.endpoint_url
+            ) as s3_client:
+                for i in range(0, len(s3_keys), 1000):
+                    batch = s3_keys[i:i + 1000]
+                    delete_objects = {"Objects": [{"Key": key} for key in batch]}
+
+                    response = await s3_client.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete=delete_objects,
+                    )
+
+                    for deleted in response.get("Deleted", []):
+                        results["deleted"].append(deleted["Key"])
+
+                    for error in response.get("Errors", []):
+                        logger.error(
+                            f"Failed to delete {error['Key']}: {error['Message']}"
+                        )
+                        results["errors"].append(error["Key"])
+
+            logger.info(
+                f"Batch delete: {len(results['deleted'])} succeeded, "
+                f"{len(results['errors'])} failed"
+            )
+        except ClientError as e:
+            logger.error(f"Batch delete failed: {e}")
+            results["errors"].extend(s3_keys)
+
+        return results
+
     async def file_exists(self, s3_key: str) -> bool:
         """
         Check if a file exists in S3.
@@ -151,14 +199,11 @@ class S3Service:
     ) -> str:
         """
         Generate a presigned URL for temporary access to a private file.
-
         Args:
             s3_key: The S3 key of the file
             expiration: Time in seconds for the URL to remain valid (default: 1 hour)
-
         Returns:
             A presigned URL
-
         Raises:
             Exception: If URL generation fails
         """

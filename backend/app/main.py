@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, Base
-from .routers import photos, auth
+from .routers import photos, auth, projects
 from .models import photo as _photo
 from .models import user as _user
+from .models import project as _project
 
 app = FastAPI(
     title="API (async, SQLite)",
@@ -30,7 +31,8 @@ async def on_startup():
 
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(photos.router, prefix="/photos", tags=["photos"])
+app.include_router(projects.router, prefix="/projects", tags=["projects"])
+app.include_router(photos.router, tags=["photos"])
 
 @app.get("/health")
 async def health():

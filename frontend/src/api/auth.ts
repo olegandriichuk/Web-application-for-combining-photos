@@ -1,27 +1,7 @@
 import { api } from "./client";
+import type { RegisterData, LoginData, TokenResponse, User } from "../types/auth";
 
-export interface RegisterData {
-  name: string;
-  email: string;
-  password: string;
-}
-
-export interface LoginData {
-  email: string;
-  password: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  token_type: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  created_at: string;
-}
+export type { RegisterData, LoginData, TokenResponse, User };
 
 export async function register(data: RegisterData): Promise<User> {
   const response = await api.post<User>("/auth/register", data);

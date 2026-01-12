@@ -1,42 +1,45 @@
-// frontend/src/api/photos.ts
 import { api } from "./client";
+import type { PhotoItem } from "../types/photo";
 
-export type PhotoItem = {
-  id: string;
-  original_name: string;
-  mime: string;
-  size: number;
-  created_at: string; // ISO datetime string
-};
+export type { PhotoItem };
 
-export const uploadPhotos = async (files: File[]) => {
+export const uploadPhoto = async (projectId: string, file: File) => {
   const form = new FormData();
-  files.forEach((f) => form.append("files", f));
-  const resp = await api.post("/photos", form, {
+  form.append("file", file); // важливо: ключ "file" має збігатися з бекендом
+
+  const resp = await api.post(`/projects/${projectId}/photos`, form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return resp.data.items as string[]; // масив id
+
+  return resp.data.item as string; // id фото
 };
 
-export const listPhotos = async (limit = 100, offset = 0) => {
-  const resp = await api.get("/photos", { params: { limit, offset } });
-  return resp.data.items as PhotoItem[];
+export const listPhotos = async (
+  projectId: string,
+  limit = 100,
+  offset = 0
+): Promise<PhotoItem[]> => {
+  const resp = await api.get(`/projects/${projectId}/photos`, {
+    params: { limit, offset },
+  });
+  return resp.data.items;
 };
 
-export const photoUrl = (id: string) => {
-  // повертає URL для перегляду/завантаження
-  return `${api.defaults.baseURL}/photos/${id}`;
+export const photoUrl = (projectId: string, photoId: string) => {
+  return `${api.defaults.baseURL}/projects/${projectId}/photos/${photoId}`;
 };
 
-export const fetchPhotoBlob = async (id: string): Promise<string> => {
-  // Fetch photo with authentication, return object URL
-  const resp = await api.get(`/photos/${id}`, {
-    responseType: 'blob'
+export const fetchPhotoBlob = async (
+  projectId: string,
+  photoId: string
+): Promise<string> => {
+  const resp = await api.get(`/projects/${projectId}/photos/${photoId}`, {
+    responseType: "blob",
   });
   return URL.createObjectURL(resp.data);
 };
 
-export const deletePhoto = async (id: string) => {
-  const resp = await api.delete(`/photos/${id}`);
+export const deletePhoto = async (projectId: string, photoId: string) => {
+  const resp = await api.delete(`/projects/${projectId}/photos/${photoId}`);
   return resp.data;
 };

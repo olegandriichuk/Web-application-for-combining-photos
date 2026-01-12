@@ -8,7 +8,8 @@
       "Bash(cat:*)",
       "Bash(git config:*)",
       "Bash(git ls-tree:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

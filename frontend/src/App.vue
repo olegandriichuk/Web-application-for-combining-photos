@@ -1,19 +1,6 @@
-<!-- frontend/src/App.vue -->
 <template>
-  <div v-if="!authStore.isAuthenticated.value">
-    <LoginPage
-      v-if="showLogin"
-      @switch-to-register="showLogin = false"
-      @login-success="handleAuthSuccess"
-    />
-    <RegisterPage
-      v-else
-      @switch-to-login="showLogin = true"
-      @register-success="handleAuthSuccess"
-    />
-  </div>
-  <div v-else>
-    <div class="navbar">
+  <div>
+    <div v-if="authStore.isAuthenticated.value" class="navbar">
       <div class="navbar-content">
         <h2 class="navbar-title">Image Stitch Generator</h2>
         <div class="navbar-actions">
@@ -22,32 +9,22 @@
         </div>
       </div>
     </div>
-    <HomePage />
+
+    <router-view />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import HomePage from './pages/HomePage.vue'
-import LoginPage from './pages/LoginPage.vue'
-import RegisterPage from './pages/RegisterPage.vue'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { authStore } from './stores/authStore'
 import { getCurrentUser } from './api/auth'
 
-const showLogin = ref(true)
-
-const handleAuthSuccess = async () => {
-  try {
-    const user = await getCurrentUser()
-    authStore.setUser(user)
-  } catch (e) {
-    console.error('Failed to get user info', e)
-  }
-}
+const router = useRouter()
 
 const handleLogout = () => {
   authStore.logout()
-  showLogin.value = true
+  router.push('/login')
 }
 
 onMounted(async () => {
@@ -58,6 +35,7 @@ onMounted(async () => {
     } catch (e) {
       console.error('Failed to get user info', e)
       authStore.logout()
+      router.push('/login')
     }
   }
 })
