@@ -1,11 +1,12 @@
+from datetime import datetime
 from pydantic import BaseModel
+
 
 class PhotoOut(BaseModel):
     id: str
     original_name: str
     mime: str
     size: int
-    created_at: str
+    created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

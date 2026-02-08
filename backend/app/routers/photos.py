@@ -1,7 +1,5 @@
 import os
 import uuid
-import asyncio
-from typing import List
 from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
@@ -15,6 +13,7 @@ from ..services.s3_service import s3_service
 from ..services.deletion_service import deletion_service
 from ..dependencies.auth import get_current_user
 from ..models.user import User
+from ..schemas.photo import PhotoOut
 
 router = APIRouter()
 
@@ -26,7 +25,7 @@ def _safe_ext(name: str | None) -> str:
     return ext if 0 < len(ext) <= 10 else ""
 
 
-@router.post("/projects/{project_id}/photos", summary="Upload single photo to project")
+@router.post("/projects/{project_id}/photos", summary="Upload single photo to project g")
 async def upload_photo(
     project_id: str,
     file: UploadFile = File(...),
@@ -37,19 +36,19 @@ async def upload_photo(
     Upload ONE photo to a specific project.
     Returns: {"item": "<photo_id>"}
     """
-    # 1) Перевірка проєкту + owner
+    # 1) Verify project exists and user is owner
     project = await project_repo.get_project_with_ownership_check(
         session, project_id, current_user.id
     )
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # 2) Генеруємо id + ключ S3
+    # 2) Generate photo id and S3 key
     fid = str(uuid.uuid4())
     ext = _safe_ext(file.filename)
     s3_key = f"photos/{fid}{ext}"
 
-    # 3) Читаємо контент (увага: читає файл повністю в RAM)
+    # 3) Read file content (note: loads entire file into RAM)
     file_content = await file.read()
     if not file_content:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -58,7 +57,7 @@ async def upload_photo(
     content_type = file.content_type or "application/octet-stream"
     original_name = file.filename or f"{fid}{ext}"
 
-    # 4) Завантаження в S3
+    # 4) Upload to S3
     try:
         await s3_service.upload_file(
             file_data=file_content,
@@ -68,7 +67,7 @@ async def upload_photo(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {str(e)}")
 
-    # 5) Запис метаданих у БД
+    # 5) Save metadata to database
     await photo_repo.create_photo_meta(
         session,
         id=fid,
@@ -91,7 +90,7 @@ async def list_photos(
     offset: int = 0,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> dict[str, list[PhotoOut]]:
     """List all photos in a specific project"""
     # Verify project ownership
     project = await project_repo.get_project_with_ownership_check(
@@ -107,19 +106,7 @@ async def list_photos(
         limit=limit,
         offset=offset
     )
-    items = [
-        {
-            "id": r.id,
-            "original_name": r.original_name,
-            "mime": r.mime,
-            "size": r.size,
-            "created_at": r.created_at.isoformat()
-            if hasattr(r.created_at, "isoformat")
-            else str(r.created_at),
-        }
-        for r in rows
-    ]
-    return {"items": items}
+    return {"items": [PhotoOut.model_validate(r) for r in rows]}
 
 
 @router.get("/projects/{project_id}/photos/{photo_id}", summary="View/download photo")

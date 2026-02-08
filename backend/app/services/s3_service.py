@@ -1,6 +1,5 @@
 """Service for interacting with AWS S3 storage."""
 import logging
-from typing import BinaryIO
 import aioboto3
 from botocore.exceptions import ClientError
 from ..config import settings
