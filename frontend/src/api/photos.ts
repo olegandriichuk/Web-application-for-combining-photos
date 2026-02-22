@@ -5,13 +5,13 @@ export type { PhotoItem };
 
 export const uploadPhoto = async (projectId: string, file: File) => {
   const form = new FormData();
-  form.append("file", file); // важливо: ключ "file" має збігатися з бекендом
+  form.append("file", file); 
 
   const resp = await api.post(`/projects/${projectId}/photos`, form, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 
-  return resp.data.item as string; // id фото
+  return resp.data.item as string; // id photo
 };
 
 export const listPhotos = async (
@@ -25,9 +25,7 @@ export const listPhotos = async (
   return resp.data.items;
 };
 
-export const photoUrl = (projectId: string, photoId: string) => {
-  return `${api.defaults.baseURL}/projects/${projectId}/photos/${photoId}`;
-};
+
 
 export const fetchPhotoBlob = async (
   projectId: string,

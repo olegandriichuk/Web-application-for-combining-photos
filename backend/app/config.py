@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # Optional: for local development with localstack
     aws_endpoint_url: str | None = None
 
+    # Redis Configuration (optional - set redis_enabled=true to use)
+    redis_enabled: bool = False
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

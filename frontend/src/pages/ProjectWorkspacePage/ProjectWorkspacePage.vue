@@ -88,27 +88,42 @@
 
       <div v-if="isLoading" class="status status-loading">Loading...</div>
       <div v-if="error" class="status status-error">{{ error }}</div>
+    </div>
 
-      <div class="actions">
-        <button
-          class="generate-btn"
-          @click="refresh"
-          :disabled="isLoading || selectedCount < 4"
-        >
+    <!-- Stitch Section -->
+    <div class="card" v-if="photos.length > 0">
+      <div class="card-head">
+        <h2 class="card-title">Image Stitching</h2>
+        <p class="card-subtitle">Create a stitched image from your uploaded photos</p>
+      </div>
+
+      <div class="stitch-toggle">
+        <button class="generate-btn" @click="toggleStitchForm">
           <span class="btn-spark" aria-hidden="true">✦</span>
-          Generate Stitched Image
+          {{ showStitchForm ? 'Hide Form' : 'Create Stitch Job' }}
         </button>
-
-        <p class="hint" v-if="selectedCount < 4">
-          Please upload at least 4 images to generate
-        </p>
       </div>
     </div>
+
+    <!-- Stitch Job Form -->
+    <StitchJobForm
+      v-if="showStitchForm && photos.length > 0"
+      :project-id="projectId"
+      :photo-ids="photoIds"
+      @created="onStitchJobCreated"
+    />
+
+    <!-- Stitch Job History -->
+    <StitchJobHistory
+      v-if="photos.length > 0"
+      ref="historyRef"
+      :project-id="projectId"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   listPhotos as apiListPhotos,
@@ -118,6 +133,8 @@ import {
   type PhotoItem,
 } from '../../api/photos'
 import { getProject, type Project } from '../../api/projects'
+import StitchJobForm from '../../components/StitchJobForm.vue'
+import StitchJobHistory from '../../components/StitchJobHistory.vue'
 import './ProjectWorkspacePage.css'
 
 const route = useRoute()
@@ -133,6 +150,10 @@ const error = ref<string | null>(null)
 
 const selectedCount = ref(0)
 const isDragActive = ref(false)
+const showStitchForm = ref(false)
+const historyRef = ref<InstanceType<typeof StitchJobHistory> | null>(null)
+
+const photoIds = computed(() => photos.value.map(p => p.id))
 
 const getPhotoUrl = (id: string): string => {
   return photoBlobUrls.value[id] || ''
@@ -233,6 +254,15 @@ const onDrop = async (e: DragEvent) => {
 
 const goBackToProjects = () => {
   router.push('/projects')
+}
+
+const onStitchJobCreated = () => {
+  showStitchForm.value = false
+  historyRef.value?.loadJobs()
+}
+
+const toggleStitchForm = () => {
+  showStitchForm.value = !showStitchForm.value
 }
 
 onMounted(async () => {

@@ -472,3 +472,8 @@ body {
   margin: 0;
   font-size: 1.1rem;
 }
+
+.stitch-toggle {
+  text-align: center;
+  padding: 10px 0;
+}

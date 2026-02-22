@@ -2,10 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import engine, Base
-from .routers import photos, auth, projects
+from .routers import photos, auth, projects, stitch_jobs
 from .models import photo as _photo
 from .models import user as _user
 from .models import project as _project
+from .models import stitch_job as _stitch_job
 
 app = FastAPI(
     title="API (async, SQLite)",
@@ -33,6 +34,7 @@ async def on_startup():
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(photos.router, tags=["photos"])
+app.include_router(stitch_jobs.router, tags=["stitch-jobs"])
 
 @app.get("/health")
 async def health():
