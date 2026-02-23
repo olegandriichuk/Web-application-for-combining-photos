@@ -32,6 +32,9 @@ class StitchJob(Base):
         index=True
     )
 
+    # Retry tracking
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     # Stitching parameters
     exp_name: Mapped[str] = mapped_column(String(255), nullable=False)
     ref_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -49,6 +52,10 @@ class StitchJob(Base):
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now()
+    )
+    queued_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
     )
     started_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),

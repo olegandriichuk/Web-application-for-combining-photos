@@ -103,6 +103,79 @@ async def list_stitch_jobs(
     )
 
 
+@router.post(
+    "/projects/{project_id}/stitch-jobs/{job_id}/cancel",
+    response_model=StitchJobOut,
+    summary="Cancel a stitch job",
+)
+async def cancel_stitch_job(
+    project_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Cancel a queued or running stitch job.
+
+    Allowed from statuses QUEUED or RUNNING.
+    Rejects FINISHED (409), FAILED (409), and CANCELED (409).
+    """
+    project = await project_repo.get_project_with_ownership_check(
+        session, project_id, current_user.id
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        return await stitch_job_service.cancel_stitch_job(
+            session,
+            job_id=job_id,
+            project_id=project_id,
+            user_id=current_user.id,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Stitch job not found")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post(
+    "/projects/{project_id}/stitch-jobs/{job_id}/run",
+    response_model=StitchJobOut,
+    summary="Run or re-run a stitch job",
+)
+async def run_stitch_job(
+    project_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Queue an existing stitch job for (re-)processing.
+
+    Allowed from statuses FAILED or FINISHED.
+    Rejects CANCELED (409), RUNNING (409), and QUEUED (409).
+    Resets result fields, sets status to 'queued', and enqueues to Redis Streams.
+    """
+    project = await project_repo.get_project_with_ownership_check(
+        session, project_id, current_user.id
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        return await stitch_job_service.run_stitch_job(
+            session,
+            job_id=job_id,
+            project_id=project_id,
+            user_id=current_user.id,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Stitch job not found")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
 @router.get(
     "/projects/{project_id}/stitch-jobs/{job_id}",
     response_model=StitchJobOut,

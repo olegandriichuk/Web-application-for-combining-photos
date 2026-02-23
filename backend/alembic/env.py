@@ -16,6 +16,7 @@ from app.database import Base
 from app.models import user as _user
 from app.models import photo as _photo
 from app.models import project as _project
+from app.models import stitch_job as _stitch_job
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

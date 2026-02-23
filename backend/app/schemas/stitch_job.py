@@ -111,7 +111,9 @@ class StitchJobOut(BaseModel):
     corner_points: list[list[int]]
     relative_scale: float
     photo_ids: list[str]
+    attempt: int = 0
     created_at: datetime
+    queued_at: datetime | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     result_s3_key: str | None = None

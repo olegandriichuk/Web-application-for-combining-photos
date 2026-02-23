@@ -18,12 +18,24 @@ class Settings(BaseSettings):
     # Optional: for local development with localstack
     aws_endpoint_url: str | None = None
 
+    # Database
+    database_url: str = "sqlite+aiosqlite:///./app.db"
+
     # Redis Configuration (optional - set redis_enabled=true to use)
     redis_enabled: bool = False
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_db: int = 0
-    redis_password: str | None = None
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Exposea
+    exposea_path: str = "/home/makaroni/Exposea"
+
+    # Redis Streams / Worker Configuration
+    stream_key: str = "stitch:jobs"
+    consumer_group: str = "stitch-workers"
+    consumer_name: str = "worker-1"
+    block_ms: int = 5000
+    claim_idle_ms: int = 600000  # 10 minutes
+    max_retries: int = 3
+    work_dir: str = "/tmp/stitch_worker"
 
     model_config = SettingsConfigDict(
         env_file=".env",

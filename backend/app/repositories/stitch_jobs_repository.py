@@ -145,6 +145,24 @@ async def update_stitch_job_status(
     return job
 
 
+async def reset_job_for_requeue(
+    session: AsyncSession,
+    job: StitchJob,
+    queued_at: datetime,
+) -> StitchJob:
+    """Reset a job's transient fields and set status to queued for re-run."""
+    job.status = "queued"
+    job.queued_at = queued_at
+    job.started_at = None
+    job.finished_at = None
+    job.error_message = None
+    job.result_s3_key = None
+    job.log_s3_key = None
+    job.attempt = 0
+    await session.flush()
+    return job
+
+
 async def delete_stitch_job(
     session: AsyncSession,
     job: StitchJob
