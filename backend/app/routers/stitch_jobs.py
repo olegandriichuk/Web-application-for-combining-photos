@@ -177,6 +177,49 @@ async def run_stitch_job(
 
 
 @router.get(
+    "/projects/{project_id}/stitch-jobs/{job_id}/result",
+    summary="Get presigned download and preview URLs for a finished job",
+)
+async def get_stitch_job_result(
+    project_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns two short-lived S3 presigned URLs:
+      - download_url  – the full-resolution original file (TIF, JP2, …)
+      - preview_url   – a JPEG thumbnail suitable for <img> in any browser
+                        (null if preview generation failed or job predates this feature)
+    """
+    from ..services.s3_service import s3_service
+
+    project = await project_repo.get_project_with_ownership_check(
+        session, project_id, current_user.id
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    job = await stitch_job_service.get_job(
+        session,
+        job_id=job_id,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Stitch job not found")
+    if job.status != "finished" or not job.result_s3_key:
+        raise HTTPException(status_code=404, detail="Result not available yet")
+
+    download_url = await s3_service.generate_presigned_url(job.result_s3_key, expiration=3600)
+    preview_url = None
+    if job.preview_s3_key:
+        preview_url = await s3_service.generate_presigned_url(job.preview_s3_key, expiration=3600)
+
+    return {"download_url": download_url, "preview_url": preview_url}
+
+
+@router.get(
     "/projects/{project_id}/stitch-jobs/{job_id}",
     response_model=StitchJobOut,
     summary="Get a specific stitch job"

@@ -117,6 +117,7 @@ class StitchJobOut(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     result_s3_key: str | None = None
+    preview_s3_key: str | None = None
     error_message: str | None = None
 
     class Config:

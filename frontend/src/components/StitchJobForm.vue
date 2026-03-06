@@ -191,6 +191,7 @@ import {
   SAVE_FORMAT_OPTIONS,
   type PresetName,
   type SaveFormat,
+  type StitchJob,
   type StitchJobCreate,
 } from '../types/stitchJob'
 
@@ -200,7 +201,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'created'): void
+  (e: 'created', job: StitchJob): void
 }>()
 
 const form = reactive({
@@ -223,17 +224,6 @@ const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 
 const selectedPhotoIds = computed(() => props.photoIds)
-
-const updateCornerPointsFromResolution = () => {
-  const w = form.final_res_width || 0
-  const h = form.final_res_height || 0
-  form.corner_points = [
-    [0, 0],
-    [w, 0],
-    [w, h],
-    [0, h],
-  ]
-}
 
 const onSubmit = async () => {
   error.value = null
@@ -259,8 +249,8 @@ const onSubmit = async () => {
       relative_scale: form.relative_scale,
     }
 
-    await createStitchJob(props.projectId, data)
-    emit('created')
+    const job = await createStitchJob(props.projectId, data)
+    emit('created', job)
 
     // Reset form
     form.exp_name = ''

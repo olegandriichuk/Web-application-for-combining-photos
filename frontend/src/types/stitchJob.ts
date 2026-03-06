@@ -26,6 +26,7 @@ export type StitchJob = {
   started_at: string | null;
   finished_at: string | null;
   result_s3_key: string | null;
+  preview_s3_key: string | null;
   error_message: string | null;
 };
 

@@ -31,6 +31,7 @@ def stitch_job_to_dict(job: StitchJob) -> dict:
         "started_at": job.started_at,
         "finished_at": job.finished_at,
         "result_s3_key": job.result_s3_key,
+        "preview_s3_key": job.preview_s3_key,
         "error_message": job.error_message,
     }
 

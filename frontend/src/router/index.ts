@@ -7,6 +7,7 @@ import LoginPage from '../pages/LoginPage/LoginPage.vue'
 import RegisterPage from '../pages/RegisterPage/RegisterPage.vue'
 import ProjectsPage from '../pages/ProjectsPage/ProjectsPage.vue'
 import ProjectWorkspacePage from '../pages/ProjectWorkspacePage/ProjectWorkspacePage.vue'
+import ProjectHistoryPage from '../pages/ProjectHistoryPage/ProjectHistoryPage.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -28,9 +29,15 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/projects/:id',
+    path: '/projects/:projectId/workspace',
     name: 'ProjectWorkspace',
     component: ProjectWorkspacePage,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/projects/:projectId/history',
+    name: 'ProjectHistory',
+    component: ProjectHistoryPage,
     meta: { requiresAuth: true }
   },
   {

@@ -27,14 +27,12 @@ export const listPhotos = async (
 
 
 
-export const fetchPhotoBlob = async (
+export const fetchPhotoUrl = async (
   projectId: string,
   photoId: string
 ): Promise<string> => {
-  const resp = await api.get(`/projects/${projectId}/photos/${photoId}`, {
-    responseType: "blob",
-  });
-  return URL.createObjectURL(resp.data);
+  const resp = await api.get(`/projects/${projectId}/photos/${photoId}`);
+  return resp.data.url as string;
 };
 
 export const deletePhoto = async (projectId: string, photoId: string) => {

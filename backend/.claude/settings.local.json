@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(cd \"/mnt/c/Bachelor Thesis/backend\" && venv/bin/alembic stamp a1b2c3d4e5f6 && venv/bin/alembic upgrade head 2>&1)",
+      "Bash(cd \"/mnt/c/Bachelor Thesis/backend\" && venv/bin/alembic current 2>&1 && venv/bin/alembic history 2>&1)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(bash:*)"
     ]
   }
 }

@@ -68,6 +68,7 @@ class StitchJob(Base):
 
     # Result storage
     result_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
+    preview_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
     log_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
 

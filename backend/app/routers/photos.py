@@ -1,9 +1,7 @@
 import os
 import uuid
-from io import BytesIO
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -131,20 +129,15 @@ async def get_photo(
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    # Download from S3
+    # Generate a presigned URL so the browser fetches the file directly from S3
     try:
-        file_data = await s3_service.download_file(photo.s3_key)
+        url = await s3_service.generate_presigned_url(photo.s3_key, expiration=3600)
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to download file from S3: {str(e)}"
+            status_code=500, detail=f"Failed to generate presigned URL: {str(e)}"
         )
 
-    # Return as streaming response
-    return StreamingResponse(
-        BytesIO(file_data),
-        media_type=photo.mime,
-        headers={"Content-Disposition": f'inline; filename="{photo.original_name}"'},
-    )
+    return {"url": url}
 
 
 @router.delete("/projects/{project_id}/photos/{photo_id}", summary="Delete photo")

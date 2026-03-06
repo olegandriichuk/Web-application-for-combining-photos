@@ -14,12 +14,14 @@ Environment variables (see app/config.py):
 """
 
 import asyncio
+import io
 import json
 import logging
 import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
 
 from .config import settings
 from .database import async_session_maker
@@ -53,6 +55,7 @@ async def _update_job(
     started_at: datetime | None = None,
     finished_at: datetime | None = None,
     result_s3_key: str | None = None,
+    preview_s3_key: str | None = None,
     log_s3_key: str | None = None,
     error_message: str | None = None,
     attempt: int | None = None,
@@ -69,6 +72,8 @@ async def _update_job(
             job.finished_at = finished_at
         if result_s3_key is not None:
             job.result_s3_key = result_s3_key
+        if preview_s3_key is not None:
+            job.preview_s3_key = preview_s3_key
         if log_s3_key is not None:
             job.log_s3_key = log_s3_key
         if error_message is not None:
@@ -116,7 +121,44 @@ def _build_exposea_config_yaml(job: StitchJob) -> str:
     )
 
 
+# ── preview generation ────────────────────────────────────────────
+
+PREVIEW_MAX_PX = 2048  # longest edge of the JPEG preview
+
+
+def _generate_preview(result_path: Path) -> bytes:
+    """
+    Convert *result_path* to a JPEG preview using ImageMagick.
+    Handles formats Pillow cannot (e.g. SGILOG-compressed TIFF from Exposea).
+    Runs synchronously; call via asyncio.to_thread.
+    """
+    import subprocess
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+
+    try:
+        subprocess.run(
+            [
+                "convert",
+                str(result_path),
+                "-gamma", "2.2",
+                "-resize", f"{PREVIEW_MAX_PX}x{PREVIEW_MAX_PX}>",
+                "-quality", "85",
+                str(tmp_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        return tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 # ── job processing ────────────────────────────────────────────────
+
+_active_jobs: set[str] = set()  # job IDs currently being processed by this worker
 
 
 async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> None:
@@ -131,6 +173,12 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
       7. Upload result to S3
       8. Mark FINISHED or FAILED
     """
+    # If the reclaim loop fires while this worker is already processing the same
+    # job (Exposea is slow), skip without acking so the PEL entry stays alive.
+    if is_reclaim and job_id in _active_jobs:
+        logger.info("[%s] Job %s is already in progress – skipping reclaim", msg_id, job_id)
+        return
+
     t0 = time.monotonic()
     logger.info("[%s] Processing job %s (reclaim=%s)", msg_id, job_id, is_reclaim)
 
@@ -140,11 +188,13 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
         await redis_service.ack(msg_id)
         return
 
-    # If the job was canceled while sitting in the queue, skip it.
-    if job.status == "canceled":
-        logger.info("[%s] Job %s is canceled – acking and skipping", msg_id, job_id)
+    # Skip jobs that are no longer in a runnable state.
+    if job.status not in ("queued", "running"):
+        logger.info("[%s] Job %s has status '%s' – acking and skipping", msg_id, job_id, job.status)
         await redis_service.ack(msg_id)
         return
+
+    _active_jobs.add(job_id)
 
     # Check max retries for reclaimed messages
     current_attempt = job.attempt + 1
@@ -240,9 +290,20 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
 
         result_file = result_files[0]
         result_bytes = result_file.read_bytes()
-        s3_key = f"stitch-results/{job.project_id}/{job.id}/{result_file.name}"
+        result_filename = f"{job.exp_name}{result_file.suffix}"
+        s3_key = f"stitch-results/{job.project_id}/{job.id}/{result_filename}"
         await s3_service.upload_file(result_bytes, s3_key)
         logger.info("[%s] Uploaded result to s3://%s (%d bytes)", msg_id, s3_key, len(result_bytes))
+
+        # ── Generate JPEG preview ─────────────────────────────────
+        preview_s3_key: str | None = None
+        try:
+            preview_bytes = await asyncio.to_thread(_generate_preview, result_file)
+            preview_s3_key = f"stitch-results/{job.project_id}/{job.id}/preview.jpg"
+            await s3_service.upload_file(preview_bytes, preview_s3_key, content_type="image/jpeg")
+            logger.info("[%s] Uploaded preview to s3://%s (%d bytes)", msg_id, preview_s3_key, len(preview_bytes))
+        except Exception as prev_exc:
+            logger.warning("[%s] Preview generation failed (non-fatal): %s", msg_id, prev_exc)
 
         # ── Mark FINISHED ─────────────────────────────────────────
         await _update_job(
@@ -250,6 +311,7 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
             status="finished",
             finished_at=datetime.now(timezone.utc),
             result_s3_key=s3_key,
+            preview_s3_key=preview_s3_key,
             error_message="",
         )
         await redis_service.ack(msg_id)
@@ -267,6 +329,7 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
         await redis_service.ack(msg_id)
 
     finally:
+        _active_jobs.discard(job_id)
         # Clean up working directory
         if work_root.exists():
             shutil.rmtree(work_root, ignore_errors=True)

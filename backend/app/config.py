@@ -1,4 +1,12 @@
+import os
+import socket
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_consumer_name() -> str:
+    return f"{socket.gethostname()}-{os.getpid()}"
 
 
 class Settings(BaseSettings):
@@ -31,7 +39,7 @@ class Settings(BaseSettings):
     # Redis Streams / Worker Configuration
     stream_key: str = "stitch:jobs"
     consumer_group: str = "stitch-workers"
-    consumer_name: str = "worker-1"
+    consumer_name: str = Field(default_factory=_default_consumer_name)
     block_ms: int = 5000
     claim_idle_ms: int = 600000  # 10 minutes
     max_retries: int = 3

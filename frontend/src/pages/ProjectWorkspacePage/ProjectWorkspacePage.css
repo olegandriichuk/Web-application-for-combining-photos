@@ -220,18 +220,75 @@ body {
     color: #94a3b8;
 }
 
-.gallery {
-    padding-top: 18px;
+/* ── Two-column photo + upload layout ─────────────────── */
+
+.media-panel {
+    display: flex;
+    gap: 18px;
+    /* default align-items: stretch keeps both columns equal height */
 }
 
+.media-left {
+    flex: 1;
+    min-width: 0; /* prevent grid blowout */
+}
 
-/* NEW gallery tiles (like the mock) */
+.media-right {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Panel variant: dropzone fills the right column */
+.dropzone-panel {
+    margin-top: 0;
+    flex: 1;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+}
+
+.dropzone-panel .dropzone-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+
+/* Empty placeholder in the left column */
+.empty-state-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+}
+
+.empty-state-inline .empty-state-text {
+    width: 100%;
+}
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 680px) {
+    .media-panel {
+        flex-direction: column;
+    }
+    .media-right {
+        width: 100%;
+    }
+    .dropzone-panel {
+        min-height: 180px;
+    }
+}
+
+/* ── Photo grid ─────────────────────────────────────────── */
 
 .photos-grid {
     display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    margin-top: 14px;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 }
 
 .photo-tile {
@@ -250,7 +307,7 @@ body {
 
 .tile-img {
     width: 100%;
-    height: 210px;
+    height: 180px;
     object-fit: cover;
     display: block;
 }
@@ -476,4 +533,62 @@ body {
 .stitch-toggle {
   text-align: center;
   padding: 10px 0;
+}
+
+.latest-job-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.latest-job-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.latest-job-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.latest-job-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.latest-job-status {
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.status-queued  { background: #e2e8f0; color: #475569; }
+.status-running { background: #dbeafe; color: #1d4ed8; }
+.status-finished { background: #dcfce7; color: #15803d; }
+.status-failed  { background: #fee2e2; color: #b91c1c; }
+.status-canceled { background: #e2e8f0; color: #475569; }
+
+.history-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c3aed;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.history-link:hover {
+  text-decoration: underline;
 }

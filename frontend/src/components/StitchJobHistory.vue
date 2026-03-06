@@ -70,6 +70,10 @@
             <span class="detail-label">Photos:</span>
             <span class="detail-value">{{ job.photo_ids.length }} image(s)</span>
           </div>
+          <div class="detail-row detail-row-full">
+            <span class="detail-label">Corners:</span>
+            <span class="detail-value">{{ formatCorners(job.corner_points) }}</span>
+          </div>
         </div>
 
         <div class="job-timestamps">
@@ -93,15 +97,37 @@
         </div>
 
         <!-- Actions -->
-        <div class="job-actions">
-          <a
-            v-if="job.result_s3_key && job.status === 'finished'"
-            :href="getResultUrl(job.result_s3_key)"
-            target="_blank"
-            class="action-btn view-btn"
-          >
-            View Result
-          </a>
+        <div v-if="job.result_s3_key && job.status === 'finished'" class="job-result">
+          <div class="job-actions">
+            <button
+              v-if="!resultUrls[job.id]"
+              class="action-btn view-btn"
+              :disabled="loadingResult[job.id]"
+              @click="fetchResult(job)"
+            >
+              {{ loadingResult[job.id] ? 'Loading…' : 'View Result' }}
+            </button>
+            <template v-if="resultUrls[job.id]">
+              <a
+                :href="resultUrls[job.id]!.download_url"
+                target="_blank"
+                class="action-btn download-btn"
+              >
+                Download
+              </a>
+            </template>
+          </div>
+          <div v-if="resultUrls[job.id]" class="result-preview">
+            <img
+              v-if="resultUrls[job.id]!.preview_url"
+              :src="resultUrls[job.id]!.preview_url ?? undefined"
+              alt="Stitched result preview"
+              class="result-img"
+            />
+            <div v-else class="result-no-preview">
+              Preview not available — use Download to get the full file.
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -128,8 +154,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { listStitchJobs } from '../api/stitchJobs'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { listStitchJobs, getJobResult } from '../api/stitchJobs'
 import {
   STATUS_LABELS,
   STATUS_COLORS,
@@ -149,6 +175,32 @@ const statusFilter = ref<JobStatus | ''>('')
 const currentPage = ref(1)
 const totalPages = ref(1)
 const limit = 10
+
+const hasActiveJobs = computed(() =>
+  jobs.value.some(j => j.status === 'queued' || j.status === 'running')
+)
+
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+const startPolling = () => {
+  if (!pollInterval) {
+    pollInterval = setInterval(loadJobs, 10000)
+  }
+}
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
+
+watch(hasActiveJobs, (active) => {
+  if (active) startPolling()
+  else stopPolling()
+})
+
+onBeforeUnmount(() => stopPolling())
 
 const loadJobs = async () => {
   isLoading.value = true
@@ -188,10 +240,24 @@ const formatDate = (dateStr: string): string => {
   return date.toLocaleString()
 }
 
-const getResultUrl = (s3Key: string): string => {
-  // This would be a presigned URL or public URL from the backend
-  // For now, return a placeholder
-  return `/api/results/${s3Key}`
+const formatCorners = (pts: [number, number][]): string => {
+  return pts.map(p => `(${p[0]}, ${p[1]})`).join(' → ')
+}
+
+type ResultUrls = { download_url: string; preview_url: string | null }
+const resultUrls = ref<Record<string, ResultUrls>>({})
+const loadingResult = ref<Record<string, boolean>>({})
+
+const fetchResult = async (job: StitchJob) => {
+  if (resultUrls.value[job.id]) return
+  loadingResult.value[job.id] = true
+  try {
+    resultUrls.value[job.id] = await getJobResult(props.projectId, job.id)
+  } catch (e) {
+    console.error('Failed to load result URLs for job', job.id, e)
+  } finally {
+    loadingResult.value[job.id] = false
+  }
 }
 
 watch(() => props.projectId, () => {
@@ -352,6 +418,10 @@ defineExpose({ loadJobs })
   gap: 8px;
 }
 
+.detail-row-full {
+  grid-column: 1 / -1;
+}
+
 .detail-label {
   font-size: 12px;
   color: #64748b;
@@ -420,6 +490,40 @@ defineExpose({ loadJobs })
   background: rgba(59, 130, 246, 0.1);
   color: #1e40af;
   border: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.view-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.download-btn {
+  background: rgba(16, 185, 129, 0.1);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.18);
+}
+
+.job-result {
+  margin-top: 12px;
+}
+
+.result-preview {
+  margin-top: 12px;
+}
+
+.result-img {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  display: block;
+}
+
+.result-no-preview {
+  font-size: 12px;
+  color: #64748b;
+  padding: 10px 0;
 }
 
 .pagination {
