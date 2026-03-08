@@ -1,21 +1,44 @@
 <template>
-  <div class="page">
+  <div class="py-12 px-4 pb-16 text-[#0f172a]">
+
     <!-- Project Header -->
-    <div class="project-header">
-      <button @click="goBackToProjects" class="back-btn">
-        ← Back to Projects
-      </button>
-      <h1 class="project-title">{{ project?.name || 'Loading...' }}</h1>
-      <p v-if="project?.description" class="project-description">
-        {{ project.description }}
-      </p>
+    <div class="max-w-[1392px] mx-auto mb-7">
+      <div class="flex items-center justify-between mb-[14px]">
+        <button
+          @click="goBackToProjects"
+          class="px-[14px] py-[6px] bg-white/85 text-[#475569] border border-[rgba(15,23,42,0.12)] rounded-lg text-[13px] font-medium cursor-pointer hover:bg-[#f1f5f9] transition-colors"
+        >← </button>
+        <div class="flex gap-2 items-center">
+          <button
+            title="History"
+            @click="goToHistory"
+            class="w-9 h-9 flex items-center justify-center bg-white border border-[#e5e7eb] rounded-md cursor-pointer text-[#6b7280] shadow-sm hover:shadow-md hover:text-[#111827] transition-shadow p-0"
+          >
+            <History :size="16" aria-hidden="true" />
+          </button>
+          <button
+            title="Settings"
+            @click="handleGoToSettings"
+            class="w-9 h-9 flex items-center justify-center bg-white border border-[#e5e7eb] rounded-md cursor-pointer text-[#6b7280] shadow-sm hover:shadow-md hover:text-[#111827] transition-shadow p-0"
+          >
+            <Settings :size="16" aria-hidden="true" />
+          </button>
+          <button
+            title="Logout"
+            @click="handleLogout"
+            class="w-9 h-9 flex items-center justify-center bg-white border border-[#e5e7eb] rounded-md cursor-pointer text-[#6b7280] shadow-sm hover:shadow-md hover:text-[#111827] transition-shadow p-0"
+          >
+            <LogOut :size="16" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Photo grid (left) + Upload panel (right) -->
-    <div class="card">
-      <div class="card-head">
-        <h2 class="card-title">Uploaded Images</h2>
-        <p class="card-subtitle">
+    <div class="max-w-[1392px] mx-auto bg-white/[0.92] border border-[rgba(15,23,42,0.06)] rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.1),0_1px_0_rgba(255,255,255,0.6)_inset] p-[22px] backdrop-blur-[8px]">
+      <div class="mb-3">
+        <h2 class="m-0 text-[14px] font-bold text-[#0f172a]">Uploaded Images</h2>
+        <p class="mt-[6px] mb-0 text-[12px] text-[#64748b]">
           <template v-if="photos.length > 0">
             {{ photos.length }} {{ photos.length === 1 ? 'image ready to stitch' : 'images ready to stitch' }}
           </template>
@@ -23,109 +46,51 @@
         </p>
       </div>
 
-      <div class="media-panel">
-        <!-- Left column: photo grid -->
-        <div class="media-left">
-          <div v-if="photos.length > 0" class="photos-scroll">
-            <div class="photos-grid">
-              <article v-for="(p, idx) in photos" :key="p.id" class="photo-tile">
-                <a :href="getPhotoUrl(p.id)" target="_blank" rel="noopener" class="tile-link">
-                  <img :src="getPhotoUrl(p.id)" :alt="p.original_name" class="tile-img" />
-                </a>
-                <div class="tile-badge">{{ idx + 1 }}</div>
-                <button class="tile-close" type="button" title="Delete" @click="onDelete(p.id)">
-                  ×
-                </button>
-              </article>
-            </div>
-          </div>
-          <div v-else class="empty-state-inline">
-            <div class="empty-state-text">Upload images to start stitching</div>
-          </div>
-        </div>
-
-        <!-- Right column: drop zone -->
-        <div class="media-right">
-          <label
-            class="dropzone dropzone-panel"
-            :class="{ 'is-disabled': isLoading, 'is-active': isDragActive }"
-            @dragenter.prevent="onDragEnter"
-            @dragover.prevent="onDragOver"
-            @dragleave.prevent="onDragLeave"
-            @drop.prevent="onDrop"
-          >
-            <input
-              class="file-input"
-              type="file"
-              multiple
-              accept="image/*"
-              @change="onFilesSelected"
-              :disabled="isLoading"
-            />
-            <div class="dropzone-inner">
-              <div class="upload-circle" aria-hidden="true">⤴</div>
-              <div class="dz-title">Click to upload image or drag and drop</div>
-              <div class="dz-subtitle">Select 4–6 images (JPG, PNG, etc.)</div>
-              <div class="dz-meta" v-if="selectedCount > 0">
-                Selected: <b>{{ selectedCount }}</b> / 6
-              </div>
-              <div class="dz-meta dz-warn" v-else>
-                No images selected yet
-              </div>
-            </div>
-          </label>
-          <div v-if="isLoading" class="status status-loading">Loading...</div>
-          <div v-if="error" class="status status-error">{{ error }}</div>
-        </div>
+      <div class="flex gap-6">
+        <UploadedPhotosList
+          :photos="photos"
+          :get-photo-url="getPhotoUrl"
+          :ref-photo-id="refPhotoId"
+          @delete="onDelete"
+          @select-reference="onSelectReference"
+        />
+        <PhotoUpload
+          :is-loading="isLoading"
+          :error="error"
+          @upload="uploadFiles"
+        />
       </div>
     </div>
 
-    <!-- Stitch Section -->
-    <div class="card" v-if="photos.length > 0">
-      <div class="card-head">
-        <h2 class="card-title">Image Stitching</h2>
-        <p class="card-subtitle">Create a stitched image from your uploaded photos</p>
-      </div>
-
-      <!-- Latest job status banner -->
-      <div v-if="latestJob" class="latest-job-banner">
-        <div class="latest-job-info">
-          <span class="latest-job-label">Last submitted job:</span>
-          <span class="latest-job-name">{{ latestJob.exp_name }}</span>
-          <span
-            class="latest-job-status"
-            :class="`status-${latestJob.status}`"
-          >{{ latestJob.status }}</span>
-        </div>
-        <router-link
-          :to="`/projects/${projectId}/history`"
-          class="history-link"
-        >
-          View full history →
-        </router-link>
-      </div>
-
-      <div class="stitch-toggle">
-        <button class="generate-btn" @click="toggleStitchForm">
-          <span class="btn-spark" aria-hidden="true">✦</span>
-          {{ showStitchForm ? 'Hide Form' : 'Create Stitch Job' }}
-        </button>
-      </div>
-    </div>
-
-    <!-- Stitch Job Form -->
-    <StitchJobForm
-      v-if="showStitchForm && photos.length > 0"
+    <!-- Stitch section -->
+    <StitchJobParameters
+      v-if="photos.length > 0"
       :project-id="projectId"
       :photo-ids="photoIds"
-      @created="onStitchJobCreated"
+      :latest-job="latestJob"
+      :ref-photo-name="refPhotoName"
+      :project-name="project?.name ?? ''"
+      :project-description="project?.description ?? ''"
+      @job-created="onStitchJobCreated"
     />
+
   </div>
+
+  <ConfirmModal
+    v-if="pendingDeletePhotoId"
+    title="Delete Photo"
+    description="Are you sure you want to remove this photo from the project? This action cannot be undone."
+    confirm-label="Delete"
+    @confirm="confirmDeletePhoto"
+    @cancel="pendingDeletePhotoId = null"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Settings, LogOut, History } from 'lucide-vue-next'
+import { authStore } from '@/stores/authStore'
 import {
   listPhotos as apiListPhotos,
   uploadPhoto as apiUploadPhoto,
@@ -134,9 +99,12 @@ import {
   type PhotoItem,
 } from '../../api/photos'
 import { getProject, type Project } from '../../api/projects'
-import StitchJobForm from '../../components/StitchJobForm.vue'
 import { type StitchJob } from '../../types/stitchJob'
-import './ProjectWorkspacePage.css'
+import { showToast } from '@/lib/toast'
+import UploadedPhotosList from '../../components/UploadedPhotosList.vue'
+import PhotoUpload from '../../components/PhotoUpload.vue'
+import StitchJobParameters from '../../components/StitchJobParameters.vue'
+import ConfirmModal from '../../components/ConfirmModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -148,26 +116,22 @@ const photos = ref<PhotoItem[]>([])
 const photoBlobUrls = ref<Record<string, string>>({})
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-
-const selectedCount = ref(0)
-const isDragActive = ref(false)
-const showStitchForm = ref(false)
 const latestJob = ref<StitchJob | null>(null)
+const refPhotoId = ref<string | null>(null)
 
 const photoIds = computed(() => photos.value.map(p => p.id))
+const refPhotoName = computed(() =>
+  photos.value.find(p => p.id === refPhotoId.value)?.original_name ?? null
+)
 
-const getPhotoUrl = (id: string): string => {
-  return photoBlobUrls.value[id] || ''
-}
-
-const loadProject = async () => {
-  try {
-    project.value = await getProject(projectId.value)
-  } catch (e: any) {
-    console.error(e)
-    error.value = 'Failed to load project'
+// Clear reference selection if the selected photo is deleted
+watch(photos, (list) => {
+  if (refPhotoId.value && !list.find(p => p.id === refPhotoId.value)) {
+    refPhotoId.value = null
   }
-}
+})
+
+const getPhotoUrl = (id: string): string => photoBlobUrls.value[id] || ''
 
 const loadPhotoUrls = async (photoList: PhotoItem[]) => {
   await Promise.all(
@@ -196,18 +160,12 @@ const refresh = async () => {
   }
 }
 
-
 const uploadFiles = async (files: File[]) => {
   if (!files.length) return
-
-  const sliced = files.slice(0, 6)
-  selectedCount.value = sliced.length
-
   isLoading.value = true
   error.value = null
-
   try {
-    for (const file of sliced) {
+    for (const file of files.slice(0, 6)) {
       await apiUploadPhoto(projectId.value, file)
     }
     await refresh()
@@ -219,21 +177,22 @@ const uploadFiles = async (files: File[]) => {
   }
 }
 
+const pendingDeletePhotoId = ref<string | null>(null)
 
-const onFilesSelected = async (e: Event) => {
-  const input = e.target as HTMLInputElement
-  if (!input.files?.length) return
-  await uploadFiles(Array.from(input.files))
-  input.value = ''
+const onDelete = (id: string) => {
+  pendingDeletePhotoId.value = id
 }
 
-const onDelete = async (id: string) => {
-  if (!confirm('Delete this photo?')) return
+const confirmDeletePhoto = async () => {
+  const id = pendingDeletePhotoId.value
+  pendingDeletePhotoId.value = null
+  if (!id) return
   isLoading.value = true
   error.value = null
   try {
     await apiDeletePhoto(projectId.value, id)
-    photos.value = photos.value.filter((p) => p.id !== id)
+    photos.value = photos.value.filter(p => p.id !== id)
+    showToast('Photo removed from project')
   } catch (e: any) {
     console.error(e)
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to delete'
@@ -242,27 +201,27 @@ const onDelete = async (id: string) => {
   }
 }
 
-const onDragEnter = () => { if (!isLoading.value) isDragActive.value = true }
-const onDragOver = () => { if (!isLoading.value) isDragActive.value = true }
-const onDragLeave = () => { isDragActive.value = false }
-const onDrop = async (e: DragEvent) => {
-  isDragActive.value = false
-  const dt = e.dataTransfer
-  if (!dt?.files?.length) return
-  await uploadFiles(Array.from(dt.files).filter(f => f.type.startsWith('image/')))
+const loadProject = async () => {
+  try {
+    project.value = await getProject(projectId.value)
+  } catch (e: any) {
+    console.error(e)
+    error.value = 'Failed to load project'
+  }
 }
 
-const goBackToProjects = () => {
-  router.push('/projects')
+const onSelectReference = (photoId: string) => {
+  refPhotoId.value = refPhotoId.value === photoId ? null : photoId
 }
+
+const goBackToProjects = () => router.push('/projects')
+const goToHistory = () => router.push(`/projects/${projectId.value}/history`)
+const handleGoToSettings = () => { /* placeholder */ }
+const handleLogout = () => { authStore.logout(); router.push('/login') }
 
 const onStitchJobCreated = (job: StitchJob) => {
-  showStitchForm.value = false
   latestJob.value = job
-}
-
-const toggleStitchForm = () => {
-  showStitchForm.value = !showStitchForm.value
+  router.push(`/projects/${projectId.value}/history`)
 }
 
 onMounted(async () => {
