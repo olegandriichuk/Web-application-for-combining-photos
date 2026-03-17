@@ -8,6 +8,7 @@
         >←</button>
         <div class="flex gap-2 items-center">
           <button
+            v-if="project?.role !== 'viewer'"
             title="Workspace"
             @click="goToWorkspace"
             class="w-9 h-9 flex items-center justify-center bg-white border border-[#e5e7eb] rounded-md cursor-pointer text-[#6b7280] shadow-sm hover:shadow-md hover:text-[#111827] transition-shadow p-0"
@@ -31,7 +32,7 @@
         </div>
       </div>
       <h1 class="m-0 mb-1 text-xl font-bold text-[#0f172a]">
-        {{ project?.name || 'Loading...' }} — Job History
+        {{ project?.name || 'Loading...' }} - Job History
       </h1>
       <p v-if="project?.description" class="m-0 text-[13px] text-[#64748b]">{{ project.description }}</p>
     </div>
@@ -73,7 +74,7 @@ const goBackToProjects = () => router.push('/projects')
 const goToWorkspace = () => router.push(`/projects/${projectId.value}/workspace`)
 
 const handleGoToSettings = () => {
-  // placeholder — wire up to router.push('/settings') when the page exists
+  router.push('/settings')
 }
 
 const handleLogout = () => {

@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from ..models.project import Project
 from ..models.photo import Photo
+from ..models.project_member import ProjectMember
 import uuid
 
 
@@ -33,37 +34,36 @@ async def get_project(
     return await session.get(Project, project_id)
 
 
+async def get_project_with_membership_check(
+    session: AsyncSession,
+    project_id: str,
+    user_id: str,
+) -> Optional[Tuple[Project, str]]:
+    """Get a project and the user's role if they are a member, else None."""
+    stmt = (
+        select(Project, ProjectMember.role)
+        .join(ProjectMember, (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user_id))
+        .where(Project.id == project_id)
+    )
+    result = await session.execute(stmt)
+    row = result.one_or_none()
+    if row is None:
+        return None
+    return row[0], row[1]
+
+
 async def get_project_with_ownership_check(
     session: AsyncSession,
     project_id: str,
     user_id: str,
 ) -> Optional[Project]:
-    """Get a project only if it belongs to the user"""
+    """Get a project only if it belongs to the user (owner check via original column)."""
     stmt = select(Project).where(
         Project.id == project_id,
         Project.user_id == user_id
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
-
-
-async def list_projects(
-    session: AsyncSession,
-    *,
-    user_id: str,
-    limit: int = 100,
-    offset: int = 0,
-) -> List[Project]:
-    """List all projects for a user"""
-    stmt = (
-        select(Project)
-        .where(Project.user_id == user_id)
-        .order_by(Project.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
 
 
 async def list_projects_with_photo_count(
@@ -73,24 +73,24 @@ async def list_projects_with_photo_count(
     limit: int = 100,
     offset: int = 0,
 ) -> List[dict]:
-    """List projects with photo counts"""
+    """List projects (where user is a member) with photo counts and roles."""
     stmt = (
         select(
             Project,
-            func.count(Photo.id).label('photo_count')
+            func.count(Photo.id).label('photo_count'),
+            ProjectMember.role,
         )
+        .join(ProjectMember, (ProjectMember.project_id == Project.id) & (ProjectMember.user_id == user_id))
         .outerjoin(Photo, Photo.project_id == Project.id)
-        .where(Project.user_id == user_id)
-        .group_by(Project.id)
+        .group_by(Project.id, ProjectMember.role)
         .order_by(Project.created_at.desc())
         .limit(limit)
         .offset(offset)
     )
     result = await session.execute(stmt)
 
-    # Convert to list of dicts with project data and photo_count
     projects = []
-    for project, photo_count in result.all():
+    for project, photo_count, role in result.all():
         projects.append({
             'id': project.id,
             'user_id': project.user_id,
@@ -98,6 +98,7 @@ async def list_projects_with_photo_count(
             'description': project.description,
             'created_at': project.created_at,
             'photo_count': photo_count or 0,
+            'role': role,
         })
     return projects
 

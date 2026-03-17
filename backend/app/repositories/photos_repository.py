@@ -14,6 +14,7 @@ async def create_photo_meta(
     size: int,
     user_id: str,
     project_id: str,
+    preview_s3_key: str | None = None,
 ) -> Photo:
     obj = Photo(
         id=id,
@@ -23,6 +24,7 @@ async def create_photo_meta(
         size=size,
         user_id=user_id,
         project_id=project_id,
+        preview_s3_key=preview_s3_key,
     )
     session.add(obj)
     await session.flush()
@@ -33,16 +35,14 @@ async def get_photo(session: AsyncSession, photo_id: str) -> Optional[Photo]:
     return await session.get(Photo, photo_id)
 
 
-async def get_photo_with_ownership_check(
+async def get_photo_in_project(
     session: AsyncSession,
     photo_id: str,
-    user_id: str,
     project_id: str,
 ) -> Optional[Photo]:
-    """Get photo only if it belongs to user AND project"""
+    """Get photo only if it belongs to the project."""
     stmt = select(Photo).where(
         Photo.id == photo_id,
-        Photo.user_id == user_id,
         Photo.project_id == project_id,
     )
     result = await session.execute(stmt)
@@ -52,17 +52,13 @@ async def get_photo_with_ownership_check(
 async def list_photos(
     session: AsyncSession,
     *,
-    user_id: str,
     project_id: str,
     limit: int = 100,
     offset: int = 0,
 ) -> List[Photo]:
     stmt = (
         select(Photo)
-        .where(
-            Photo.user_id == user_id,
-            Photo.project_id == project_id
-        )
+        .where(Photo.project_id == project_id)
         .order_by(Photo.created_at.desc())
         .limit(limit)
         .offset(offset)

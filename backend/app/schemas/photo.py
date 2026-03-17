@@ -8,5 +8,6 @@ class PhotoOut(BaseModel):
     mime: str
     size: int
     created_at: datetime
+    preview_url: str | None = None
 
     model_config = {"from_attributes": True}

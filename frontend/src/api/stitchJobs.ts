@@ -4,9 +4,10 @@ import type {
   StitchJobCreate,
   StitchJobListResponse,
   StitchJobListParams,
+  TileMetadata,
 } from "../types/stitchJob";
 
-export type { StitchJob, StitchJobCreate, StitchJobListResponse, StitchJobListParams };
+export type { StitchJob, StitchJobCreate, StitchJobListResponse, StitchJobListParams, TileMetadata };
 
 export const createStitchJob = async (
   projectId: string,
@@ -32,18 +33,18 @@ export const getStitchJob = async (
   return resp.data;
 };
 
-export const cancelStitchJob = async (
-  projectId: string,
-  jobId: string
-): Promise<StitchJob> => {
-  const resp = await api.post(`/projects/${projectId}/stitch-jobs/${jobId}/cancel`);
-  return resp.data;
-};
-
 export const getJobResult = async (
   projectId: string,
   jobId: string
-): Promise<{ download_url: string; preview_url: string | null }> => {
+): Promise<{ download_url: string }> => {
   const resp = await api.get(`/projects/${projectId}/stitch-jobs/${jobId}/result`);
+  return resp.data;
+};
+
+export const getJobTileMetadata = async (
+  projectId: string,
+  jobId: string
+): Promise<TileMetadata> => {
+  const resp = await api.get(`/projects/${projectId}/stitch-jobs/${jobId}/tiles/metadata`);
   return resp.data;
 };

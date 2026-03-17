@@ -1,18 +1,21 @@
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..repositories import projects_repository as project_repo
 from ..services import stitch_job_service
 from ..dependencies.auth import get_current_user
+from ..dependencies.roles import require_project_role, require_project_role_flexible
 from ..models.user import User
+from ..models.project import Project
 from ..schemas.stitch_job import (
     StitchJobCreate,
     StitchJobOut,
     StitchJobListResponse,
+    TileMetadataOut,
     JobStatus,
 )
 
@@ -30,6 +33,7 @@ async def create_stitch_job(
     data: StitchJobCreate,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor")),
 ):
     """
     Create a new stitching job and enqueue it for processing.
@@ -37,13 +41,6 @@ async def create_stitch_job(
     The job is added to the database with status 'queued' and
     a message is sent to Redis Streams for worker consumption.
     """
-    # Verify project exists and user is owner
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     try:
         job = await stitch_job_service.create_and_enqueue_job(
             session,
@@ -70,7 +67,7 @@ async def list_stitch_jobs(
     to_date: Optional[datetime] = Query(None, alias="to", description="Filter by start date (to)"),
     sort: str = Query("startDateDesc", description="Sort order: startDateDesc or startDateAsc"),
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ):
     """
     List stitching jobs for a project with filtering and pagination.
@@ -81,19 +78,11 @@ async def list_stitch_jobs(
     - from, to: Filter by job creation date range
     - sort: Sort order (startDateDesc or startDateAsc)
     """
-    # Verify project exists and user is owner
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     status_value = status.value if status else None
 
     return await stitch_job_service.list_jobs(
         session,
         project_id=project_id,
-        user_id=current_user.id,
         status=status_value,
         from_date=from_date,
         to_date=to_date,
@@ -101,42 +90,6 @@ async def list_stitch_jobs(
         page=page,
         limit=limit,
     )
-
-
-@router.post(
-    "/projects/{project_id}/stitch-jobs/{job_id}/cancel",
-    response_model=StitchJobOut,
-    summary="Cancel a stitch job",
-)
-async def cancel_stitch_job(
-    project_id: str,
-    job_id: str,
-    session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Cancel a queued or running stitch job.
-
-    Allowed from statuses QUEUED or RUNNING.
-    Rejects FINISHED (409), FAILED (409), and CANCELED (409).
-    """
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    try:
-        return await stitch_job_service.cancel_stitch_job(
-            session,
-            job_id=job_id,
-            project_id=project_id,
-            user_id=current_user.id,
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Stitch job not found")
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.post(
@@ -148,27 +101,20 @@ async def run_stitch_job(
     project_id: str,
     job_id: str,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor")),
 ):
     """
     Queue an existing stitch job for (re-)processing.
 
     Allowed from statuses FAILED or FINISHED.
-    Rejects CANCELED (409), RUNNING (409), and QUEUED (409).
+    Rejects RUNNING (409) and QUEUED (409).
     Resets result fields, sets status to 'queued', and enqueues to Redis Streams.
     """
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     try:
         return await stitch_job_service.run_stitch_job(
             session,
             job_id=job_id,
             project_id=project_id,
-            user_id=current_user.id,
         )
     except LookupError:
         raise HTTPException(status_code=404, detail="Stitch job not found")
@@ -178,33 +124,21 @@ async def run_stitch_job(
 
 @router.get(
     "/projects/{project_id}/stitch-jobs/{job_id}/result",
-    summary="Get presigned download and preview URLs for a finished job",
+    summary="Get presigned download URL for a finished job",
 )
 async def get_stitch_job_result(
     project_id: str,
     job_id: str,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ):
-    """
-    Returns two short-lived S3 presigned URLs:
-      - download_url  – the full-resolution original file (TIF, JP2, …)
-      - preview_url   – a JPEG thumbnail suitable for <img> in any browser
-                        (null if preview generation failed or job predates this feature)
-    """
+    """Returns a short-lived S3 presigned download_url for the full-resolution result file."""
     from ..services.s3_service import s3_service
-
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
 
     job = await stitch_job_service.get_job(
         session,
         job_id=job_id,
         project_id=project_id,
-        user_id=current_user.id,
     )
     if not job:
         raise HTTPException(status_code=404, detail="Stitch job not found")
@@ -212,11 +146,7 @@ async def get_stitch_job_result(
         raise HTTPException(status_code=404, detail="Result not available yet")
 
     download_url = await s3_service.generate_presigned_url(job.result_s3_key, expiration=3600)
-    preview_url = None
-    if job.preview_s3_key:
-        preview_url = await s3_service.generate_presigned_url(job.preview_s3_key, expiration=3600)
-
-    return {"download_url": download_url, "preview_url": preview_url}
+    return {"download_url": download_url}
 
 
 @router.get(
@@ -228,23 +158,73 @@ async def get_stitch_job(
     project_id: str,
     job_id: str,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ):
     """Get details of a specific stitch job."""
-    # Verify project exists and user is owner
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     job = await stitch_job_service.get_job(
         session,
         job_id=job_id,
         project_id=project_id,
-        user_id=current_user.id,
     )
     if not job:
         raise HTTPException(status_code=404, detail="Stitch job not found")
 
     return job
+
+
+@router.get(
+    "/projects/{project_id}/stitch-jobs/{job_id}/tiles/metadata",
+    response_model=TileMetadataOut,
+    summary="Get tile viewer metadata for a finished job",
+)
+async def get_tile_metadata(
+    project_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_db),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
+):
+    """Returns tile pyramid metadata for use with the Leaflet viewer."""
+    job = await stitch_job_service.get_job(
+        session,
+        job_id=job_id,
+        project_id=project_id,
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Stitch job not found")
+    if not job.tiles_ready or not job.tiles_metadata:
+        raise HTTPException(status_code=404, detail="Tiles not available yet")
+
+    meta = json.loads(job.tiles_metadata)
+    return TileMetadataOut(**meta)
+
+
+@router.get(
+    "/projects/{project_id}/stitch-jobs/{job_id}/tiles/{z}/{x}/{y}",
+    summary="Get a single tile image",
+)
+async def get_tile(
+    project_id: str,
+    job_id: str,
+    z: int,
+    x: int,
+    y: int,
+    session: AsyncSession = Depends(get_db),
+    project_role: Tuple[Project, str] = Depends(require_project_role_flexible("owner", "editor", "viewer")),
+):
+    """Proxy a tile image from S3. Accepts JWT via ?token= or Authorization header."""
+    from ..services.s3_service import s3_service
+
+    job = await stitch_job_service.get_job(
+        session,
+        job_id=job_id,
+        project_id=project_id,
+    )
+    if not job or not job.tiles_s3_prefix:
+        raise HTTPException(status_code=404, detail="Tiles not available")
+
+    tile_key = f"{job.tiles_s3_prefix}/{z}/{x}/{y}.jpg"
+    try:
+        tile_bytes = await s3_service.download_file(tile_key)
+        return Response(content=tile_bytes, media_type="image/jpeg")
+    except Exception:
+        raise HTTPException(status_code=404, detail="Tile not found")

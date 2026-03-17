@@ -20,3 +20,19 @@ async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
 async def get_user_by_id(session: AsyncSession, user_id: str) -> User | None:
     result = await session.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
+
+async def update_user(
+    session: AsyncSession,
+    user: User,
+    *,
+    name: str | None = None,
+    email: str | None = None,
+    hashed_password: str | None = None,
+) -> User:
+    if name is not None:
+        user.name = name
+    if email is not None:
+        user.email = email
+    if hashed_password is not None:
+        user.hashed_password = hashed_password
+    return user

@@ -35,6 +35,14 @@ export const fetchPhotoUrl = async (
   return resp.data.url as string;
 };
 
+export const fetchPhotoPreviewUrl = async (
+  projectId: string,
+  photoId: string
+): Promise<string> => {
+  const resp = await api.get(`/projects/${projectId}/photos/${photoId}`);
+  return (resp.data.preview_url ?? resp.data.url) as string;
+};
+
 export const deletePhoto = async (projectId: string, photoId: string) => {
   const resp = await api.delete(`/projects/${projectId}/photos/${photoId}`);
   return resp.data;

@@ -5,7 +5,19 @@
       "Bash(cd \"/mnt/c/Bachelor Thesis/backend\" && venv/bin/alembic stamp a1b2c3d4e5f6 && venv/bin/alembic upgrade head 2>&1)",
       "Bash(cd \"/mnt/c/Bachelor Thesis/backend\" && venv/bin/alembic current 2>&1 && venv/bin/alembic history 2>&1)",
       "Bash(npx vue-tsc:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(cd \"/mnt/c/Bachelor Thesis/frontend\" && npm install leaflet @types/leaflet 2>&1 | tail -5)",
+      "Bash(cd \"/mnt/c/Bachelor Thesis/frontend\" && npm run build 2>&1 | tail -20)",
+      "Bash(sqlite3 /home/makaroni/app.db \"SELECT id, exp_name, status, tiles_ready, tiles_s3_prefix FROM stitch_jobs WHERE exp_name='test1';\")",
+      "Read(//home/makaroni/**)",
+      "Bash(curl -s -X POST http://localhost:8000/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"olegandriichuk200445@gmail.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"test123\"\"\"\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(sqlite3 /home/makaroni/app.db \"SELECT email, password_hash FROM users LIMIT 1;\")",
+      "Bash(sqlite3 /home/makaroni/app.db \".schema users\")",
+      "Bash(curl -s \"http://localhost:8000/projects/9deb70a5-7080-4f24-b5f0-f3e6a253958c/stitch-jobs?limit=5&sort=startDateDesc\" -H \"Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJvbGVnYW5kcmlpY2h1azIwMDQ0NUBnbWFpbC5jb20iLCJleHAiOjE3NzM1OTM2Mjd9.6UdR005ceGnDxrrCYK03GWFMplz1u-XjfBWg7W72Y54\" | python3 -m json.tool | head -30)",
+      "Bash(find \"/mnt/c/Bachelor Thesis/frontend/src\" -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.vue\" \\\\\\) 2>/dev/null | head -50)",
+      "Bash(cd:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

@@ -155,6 +155,21 @@ class S3Service:
 
         return results
 
+    async def list_keys_by_prefix(self, prefix: str) -> list[str]:
+        """List all S3 keys under a given prefix."""
+        keys = []
+        try:
+            async with self.session.client(
+                "s3", endpoint_url=self.endpoint_url
+            ) as s3_client:
+                paginator = s3_client.get_paginator("list_objects_v2")
+                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                    for obj in page.get("Contents", []):
+                        keys.append(obj["Key"])
+        except ClientError as e:
+            logger.error(f"Failed to list objects by prefix {prefix}: {e}")
+        return keys
+
     async def file_exists(self, s3_key: str) -> bool:
         """
         Check if a file exists in S3.

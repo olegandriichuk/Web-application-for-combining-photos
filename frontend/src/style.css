@@ -52,3 +52,9 @@ body {
         background-position: -200% 0;
     }
 }
+
+.leaflet-container,
+.leaflet-pane,
+.leaflet-tile-pane {
+    background: #ffffff !important;
+}

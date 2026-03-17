@@ -25,9 +25,21 @@ export type StitchJob = {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  ref_photo_id: string | null;
   result_s3_key: string | null;
-  preview_s3_key: string | null;
   error_message: string | null;
+  tiles_ready: boolean;
+  tiles_s3_prefix: string | null;
+};
+
+export type TileMetadata = {
+  width: number;
+  height: number;
+  tile_size: number;
+  min_zoom: number;
+  max_zoom: number;
+  tile_format: string;
+  tiles_ready: boolean;
 };
 
 export type StitchJobCreate = {
@@ -68,10 +80,10 @@ export const PRESET_OPTIONS: { value: PresetName; label: string }[] = [
 ];
 
 export const SAVE_FORMAT_OPTIONS: { value: SaveFormat; label: string }[] = [
-  { value: "jp2", label: "JPEG 2000 (.jp2)" },
-  { value: "j2k", label: "JPEG 2000 (.j2k)" },
-  { value: "tiff", label: "TIFF (.tiff)" },
-  { value: "tif", label: "TIFF (.tif)" },
+  { value: "jp2", label: ".JP2" },
+  { value: "j2k", label: ".J2K" },
+  { value: "tiff", label: ".TIFF " },
+  { value: "tif", label: ".TIFF" },
 ];
 
 export const STATUS_LABELS: Record<JobStatus, string> = {

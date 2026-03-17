@@ -95,7 +95,6 @@ import {
   listPhotos as apiListPhotos,
   uploadPhoto as apiUploadPhoto,
   deletePhoto as apiDeletePhoto,
-  fetchPhotoUrl,
   type PhotoItem,
 } from '../../api/photos'
 import { getProject, type Project } from '../../api/projects'
@@ -113,7 +112,6 @@ const projectId = ref<string>(route.params.projectId as string)
 const project = ref<Project | null>(null)
 
 const photos = ref<PhotoItem[]>([])
-const photoBlobUrls = ref<Record<string, string>>({})
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const latestJob = ref<StitchJob | null>(null)
@@ -131,19 +129,8 @@ watch(photos, (list) => {
   }
 })
 
-const getPhotoUrl = (id: string): string => photoBlobUrls.value[id] || ''
-
-const loadPhotoUrls = async (photoList: PhotoItem[]) => {
-  await Promise.all(
-    photoList.map(async (photo) => {
-      try {
-        photoBlobUrls.value[photo.id] = await fetchPhotoUrl(projectId.value, photo.id)
-      } catch (e) {
-        console.error(`Failed to load photo URL ${photo.id}:`, e)
-      }
-    })
-  )
-}
+const getPhotoUrl = (id: string): string =>
+  photos.value.find(p => p.id === id)?.preview_url ?? ''
 
 const refresh = async () => {
   isLoading.value = true
@@ -151,7 +138,6 @@ const refresh = async () => {
   try {
     const list = await apiListPhotos(projectId.value, 100, 0)
     photos.value = [...list].reverse()
-    await loadPhotoUrls(photos.value)
   } catch (e: any) {
     console.error(e)
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to load photos'
@@ -204,6 +190,10 @@ const confirmDeletePhoto = async () => {
 const loadProject = async () => {
   try {
     project.value = await getProject(projectId.value)
+    if (project.value.role === 'viewer') {
+      router.replace(`/projects/${projectId.value}/history`)
+      return
+    }
   } catch (e: any) {
     console.error(e)
     error.value = 'Failed to load project'
@@ -216,7 +206,7 @@ const onSelectReference = (photoId: string) => {
 
 const goBackToProjects = () => router.push('/projects')
 const goToHistory = () => router.push(`/projects/${projectId.value}/history`)
-const handleGoToSettings = () => { /* placeholder */ }
+const handleGoToSettings = () => { router.push('/settings') }
 const handleLogout = () => { authStore.logout(); router.push('/login') }
 
 const onStitchJobCreated = (job: StitchJob) => {

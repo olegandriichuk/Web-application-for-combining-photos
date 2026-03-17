@@ -30,14 +30,19 @@
         <label for="preset_name" class="text-[13px] font-semibold text-[#0f172a]">
           Preset Configuration <span class="text-[#ef4444] ml-[2px]">*</span>
         </label>
-        <select
-          id="preset_name"
-          v-model="form.preset_name"
-          class="h-[40px] px-[14px] border border-[rgba(15,23,42,0.12)] rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:border-[rgba(73,84,231,0.5)] focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)]"
-          required
-        >
-          <option v-for="opt in PRESET_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
+        <div class="relative">
+          <select
+            id="preset_name"
+            v-model="form.preset_name"
+            class="w-full h-[40px] pl-[14px] pr-[36px] border border-[rgba(15,23,42,0.12)] rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:border-[rgba(73,84,231,0.5)] focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)] appearance-none cursor-pointer"
+            required
+          >
+            <option v-for="opt in PRESET_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <svg class="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-[#94a3b8]" width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <p class="m-0 text-[11px] text-[#94a3b8]">Algorithm parameters for different image resolutions</p>
       </div>
 
@@ -95,14 +100,19 @@
         <label for="save_format" class="text-[13px] font-semibold text-[#0f172a]">
           Output Format <span class="text-[#ef4444] ml-[2px]">*</span>
         </label>
-        <select
-          id="save_format"
-          v-model="form.save_format"
-          class="h-[40px] px-[14px] border border-[rgba(15,23,42,0.12)] rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:border-[rgba(73,84,231,0.5)] focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)]"
-          required
-        >
-          <option v-for="opt in SAVE_FORMAT_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-        </select>
+        <div class="relative">
+          <select
+            id="save_format"
+            v-model="form.save_format"
+            class="w-full h-[40px] pl-[14px] pr-[36px] border border-[rgba(15,23,42,0.12)] rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:border-[rgba(73,84,231,0.5)] focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)] appearance-none cursor-pointer"
+            required
+          >
+            <option v-for="opt in SAVE_FORMAT_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <svg class="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-[#94a3b8]" width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
 
       <div class="flex flex-col gap-[6px]">
@@ -140,7 +150,7 @@
             min="0"
             step="1"
             class="w-full h-[40px] px-[14px] border rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)]"
-            :class="coordInvalid(point[0])
+            :class="attempted && coordInvalid(point[0])
               ? 'border-[#ef4444] focus:border-[#ef4444]'
               : 'border-[rgba(15,23,42,0.12)] focus:border-[rgba(73,84,231,0.5)]'"
             placeholder="X"
@@ -151,7 +161,7 @@
             min="0"
             step="1"
             class="w-full h-[40px] px-[14px] border rounded-[10px] text-[14px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] transition focus:outline-none focus:shadow-[0_0_0_3px_rgba(73,84,231,0.1)]"
-            :class="coordInvalid(point[1])
+            :class="attempted && coordInvalid(point[1])
               ? 'border-[#ef4444] focus:border-[#ef4444]'
               : 'border-[rgba(15,23,42,0.12)] focus:border-[rgba(73,84,231,0.5)]'"
             placeholder="Y"
@@ -159,7 +169,7 @@
         </div>
       </div>
       <p class="m-0 text-[11px] text-[#94a3b8]">Corner coordinates [x, y] of the output image (non-negative integers)</p>
-      <p v-if="!cornerPointsValid" class="m-0 text-[11px] text-[#ef4444]">All coordinates must be non-negative integers</p>
+      <p v-if="attempted && !cornerPointsValid" class="m-0 text-[11px] text-[#ef4444]">All coordinates must be non-negative integers</p>
     </div>
 
     <!-- Error -->
@@ -217,15 +227,16 @@ const form = reactive({
   save_format: 'tiff' as SaveFormat,
   relative_scale: 2,
   corner_points: [
-    [0, 0],
-    [18000, 0],
-    [18000, 12000],
-    [0, 12000],
+    [NaN, NaN],
+    [NaN, NaN],
+    [NaN, NaN],
+    [NaN, NaN],
   ] as [number, number][],
 })
 
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+const attempted = ref(false)
 
 const expNameOver = computed(() => form.exp_name.length > EXP_NAME_MAX)
 const heightInvalid = computed(() => isNaN(form.final_res_height) || form.final_res_height <= 0)
@@ -247,6 +258,7 @@ const isFormValid = computed(() =>
 )
 
 const onSubmit = async () => {
+  attempted.value = true
   if (!props.refPhotoName) {
     error.value = 'Please select a reference image from the photo cards above.'
     return

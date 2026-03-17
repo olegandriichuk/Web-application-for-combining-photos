@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, func
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 
@@ -66,11 +66,18 @@ class StitchJob(Base):
         nullable=True
     )
 
+    # Reference photo ID (the photo used as the stitching reference)
+    ref_photo_id: Mapped[str] = mapped_column(String(36), nullable=True)
+
     # Result storage
     result_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
-    preview_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
     log_s3_key: Mapped[str] = mapped_column(String(500), nullable=True)
     error_message: Mapped[str] = mapped_column(Text, nullable=True)
+
+    # Tile pyramid (for Leaflet viewer)
+    tiles_s3_prefix: Mapped[str] = mapped_column(String(500), nullable=True)
+    tiles_metadata: Mapped[str] = mapped_column(Text, nullable=True)  # JSON string
+    tiles_ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
 
     # Relationships
     user = relationship("User")

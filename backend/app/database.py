@@ -1,15 +1,19 @@
 # app/database.py
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.pool import NullPool
 from .config import settings
 
 
 DATABASE_URL = settings.database_url
 
+# NullPool ensures a fresh connection per request for SQLite,
+# preventing stale column reads after schema changes.
 engine = create_async_engine(
     DATABASE_URL,
     future=True,
     echo=False,
+    poolclass=NullPool,
 )
 
 class Base(DeclarativeBase):

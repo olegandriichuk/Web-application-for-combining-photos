@@ -1,16 +1,21 @@
+import asyncio
+import io
 import os
 import uuid
+from typing import Tuple
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Response
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..repositories import photos_repository as photo_repo
-from ..repositories import projects_repository as project_repo
 from ..services.s3_service import s3_service
 from ..services.deletion_service import deletion_service
 from ..dependencies.auth import get_current_user
+from ..dependencies.roles import require_project_role
 from ..models.user import User
+from ..models.project import Project
 from ..schemas.photo import PhotoOut
 
 router = APIRouter()
@@ -23,24 +28,29 @@ def _safe_ext(name: str | None) -> str:
     return ext if 0 < len(ext) <= 10 else ""
 
 
+def _generate_preview_bytes(file_content: bytes) -> bytes:
+    """Resize image to max 800x800 JPEG at quality 75. Must run in a thread."""
+    img = Image.open(io.BytesIO(file_content))
+    img.thumbnail((800, 800), Image.LANCZOS)
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    output = io.BytesIO()
+    img.save(output, format="JPEG", quality=75)
+    return output.getvalue()
+
+
 @router.post("/projects/{project_id}/photos", summary="Upload single photo to project g")
 async def upload_photo(
     project_id: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor")),
 ):
     """
     Upload ONE photo to a specific project.
     Returns: {"item": "<photo_id>"}
     """
-    # 1) Verify project exists and user is owner
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     # 2) Generate photo id and S3 key
     fid = str(uuid.uuid4())
     ext = _safe_ext(file.filename)
@@ -55,7 +65,7 @@ async def upload_photo(
     content_type = file.content_type or "application/octet-stream"
     original_name = file.filename or f"{fid}{ext}"
 
-    # 4) Upload to S3
+    # 4) Upload original to S3
     try:
         await s3_service.upload_file(
             file_data=file_content,
@@ -65,7 +75,22 @@ async def upload_photo(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {str(e)}")
 
-    # 5) Save metadata to database
+    # 5) Generate preview and upload to S3
+    preview_s3_key: str | None = None
+    try:
+        preview_bytes = await asyncio.to_thread(_generate_preview_bytes, file_content)
+        preview_key = f"photos/previews/{fid}.jpg"
+        await s3_service.upload_file(
+            file_data=preview_bytes,
+            s3_key=preview_key,
+            content_type="image/jpeg",
+        )
+        preview_s3_key = preview_key
+    except Exception as e:
+        # Non-fatal: original uploaded; preview can be generated on demand via fallback
+        pass
+
+    # 6) Save metadata to database
     await photo_repo.create_photo_meta(
         session,
         id=fid,
@@ -75,6 +100,7 @@ async def upload_photo(
         size=file_size,
         user_id=current_user.id,
         project_id=project_id,
+        preview_s3_key=preview_s3_key,
     )
 
     await session.commit()
@@ -87,24 +113,25 @@ async def list_photos(
     limit: int = 100,
     offset: int = 0,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ) -> dict[str, list[PhotoOut]]:
     """List all photos in a specific project"""
-    # Verify project ownership
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     rows = await photo_repo.list_photos(
         session,
-        user_id=current_user.id,
         project_id=project_id,
         limit=limit,
         offset=offset
     )
-    return {"items": [PhotoOut.model_validate(r) for r in rows]}
+    items = []
+    for r in rows:
+        out = PhotoOut.model_validate(r)
+        if r.preview_s3_key:
+            try:
+                out.preview_url = await s3_service.generate_presigned_url(r.preview_s3_key, expiration=3600)
+            except Exception:
+                pass
+        items.append(out)
+    return {"items": items}
 
 
 @router.get("/projects/{project_id}/photos/{photo_id}", summary="View/download photo")
@@ -112,24 +139,13 @@ async def get_photo(
     project_id: str,
     photo_id: str,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ):
     """Get a specific photo from a project"""
-    # Verify project ownership
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    # Get photo with triple check: exists, belongs to user, belongs to project
-    photo = await photo_repo.get_photo_with_ownership_check(
-        session, photo_id, current_user.id, project_id
-    )
+    photo = await photo_repo.get_photo_in_project(session, photo_id, project_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
-    # Generate a presigned URL so the browser fetches the file directly from S3
     try:
         url = await s3_service.generate_presigned_url(photo.s3_key, expiration=3600)
     except Exception as e:
@@ -137,7 +153,47 @@ async def get_photo(
             status_code=500, detail=f"Failed to generate presigned URL: {str(e)}"
         )
 
-    return {"url": url}
+    preview_url: str | None = None
+    if photo.preview_s3_key:
+        try:
+            preview_url = await s3_service.generate_presigned_url(photo.preview_s3_key, expiration=3600)
+        except Exception:
+            pass
+
+    return {"url": url, "preview_url": preview_url}
+
+
+@router.get("/projects/{project_id}/photos/{photo_id}/preview", summary="Get compressed photo preview")
+async def get_photo_preview(
+    project_id: str,
+    photo_id: str,
+    session: AsyncSession = Depends(get_db),
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
+):
+    """Return photo preview: serve pre-generated S3 object if available, else generate on the fly."""
+    photo = await photo_repo.get_photo_in_project(session, photo_id, project_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    # Fast path: pre-generated preview exists in S3
+    if photo.preview_s3_key:
+        try:
+            file_bytes = await s3_service.download_file(photo.preview_s3_key)
+            return Response(content=file_bytes, media_type="image/jpeg")
+        except Exception:
+            pass  # fall through to on-demand generation
+
+    # Fallback: generate preview on demand (old photos without preview_s3_key)
+    try:
+        file_bytes = await s3_service.download_file(photo.s3_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download photo: {str(e)}")
+
+    try:
+        preview_bytes = await asyncio.to_thread(_generate_preview_bytes, file_bytes)
+        return Response(content=preview_bytes, media_type="image/jpeg")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
 
 
 @router.delete("/projects/{project_id}/photos/{photo_id}", summary="Delete photo")
@@ -145,18 +201,10 @@ async def delete_photo(
     project_id: str,
     photo_id: str,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor")),
 ):
     """Delete a photo from DB and S3"""
-    project = await project_repo.get_project_with_ownership_check(
-        session, project_id, current_user.id
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    photo = await photo_repo.get_photo_with_ownership_check(
-        session, photo_id, current_user.id, project_id
-    )
+    photo = await photo_repo.get_photo_in_project(session, photo_id, project_id)
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 

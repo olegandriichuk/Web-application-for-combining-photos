@@ -21,6 +21,7 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     created_at: datetime
+    role: str
 
     class Config:
         from_attributes = True
@@ -34,6 +35,7 @@ class ProjectWithPhotoCount(BaseModel):
     description: str | None
     created_at: datetime
     photo_count: int
+    role: str
 
     class Config:
         from_attributes = True

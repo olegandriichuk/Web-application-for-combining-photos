@@ -1,6 +1,7 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from ..database import get_db
 from ..utils.auth import decode_access_token
@@ -16,6 +17,44 @@ async def get_current_user(
     token = credentials.credentials
     email = decode_access_token(token)
 
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    user = await users_repository.get_user_by_email(session, email)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    return user
+
+
+async def get_current_user_flexible(
+    token: Optional[str] = Query(default=None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    session: AsyncSession = Depends(get_db),
+) -> User:
+    """Auth dependency that accepts JWT via ?token= query param or Authorization header.
+    Used for tile serving so Leaflet can include the token in the tile URL.
+    Note: token-in-URL is acceptable for thesis scope.
+    """
+    raw_token: Optional[str] = None
+    if token:
+        raw_token = token
+    elif credentials:
+        raw_token = credentials.credentials
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    email = decode_access_token(raw_token)
     if email is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

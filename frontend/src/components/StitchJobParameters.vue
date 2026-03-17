@@ -1,11 +1,7 @@
 <template>
   <div class="max-w-[1392px] mx-auto mt-[18px] bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-5">
 
-    <!-- Project title + Owner badge -->
-    <div class="flex items-start justify-between gap-3 mb-1">
-      <h2 class="m-0 text-base font-medium leading-6 text-[#0f172a]">{{ projectName }}</h2>
-      <span class="inline-flex items-center py-[0.2rem] px-[0.7rem] bg-[#f3f4f6] text-[#6b7280] border border-[#e5e7eb] rounded-full text-[0.75rem] font-medium whitespace-nowrap shrink-0">Owner</span>
-    </div>
+    
 
     <!-- Project description -->
     <p v-if="projectDescription" class="m-0 text-base font-normal leading-6 text-[#475569] mb-5">{{ projectDescription }}</p>
@@ -56,7 +52,6 @@ const latestJobStatusClass = computed(() => {
     running:  'bg-[#dbeafe] text-[#1d4ed8]',
     finished: 'bg-[#dcfce7] text-[#15803d]',
     failed:   'bg-[#fee2e2] text-[#b91c1c]',
-    canceled: 'bg-[#e2e8f0] text-[#475569]',
   }
   return props.latestJob ? (map[props.latestJob.status] ?? '') : ''
 })

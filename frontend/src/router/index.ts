@@ -8,6 +8,7 @@ import RegisterPage from '../pages/RegisterPage/RegisterPage.vue'
 import ProjectsPage from '../pages/ProjectsPage/ProjectsPage.vue'
 import ProjectWorkspacePage from '../pages/ProjectWorkspacePage/ProjectWorkspacePage.vue'
 import ProjectHistoryPage from '../pages/ProjectHistoryPage/ProjectHistoryPage.vue'
+import AccountSettingsPage from '../pages/AccountSettingsPage/AccountSettingsPage.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -38,6 +39,12 @@ const routes: RouteRecordRaw[] = [
     path: '/projects/:projectId/history',
     name: 'ProjectHistory',
     component: ProjectHistoryPage,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'AccountSettings',
+    component: AccountSettingsPage,
     meta: { requiresAuth: true }
   },
   {

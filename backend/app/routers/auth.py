@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..schemas.user import UserCreate, UserLogin, Token, UserResponse
+from ..schemas.user import UserCreate, UserLogin, Token, UserResponse, UserUpdate, UserUpdateResponse
 from ..repositories import users_repository
 from ..utils.auth import (
     verify_password,
@@ -65,6 +65,40 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     return current_user
+
+
+@router.patch("/me", response_model=UserUpdateResponse)
+async def update_current_user(
+    data: UserUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update name, email, and/or password of the current user."""
+    if data.email and data.email != current_user.email:
+        existing = await users_repository.get_user_by_email(session, data.email)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered"
+            )
+
+    await users_repository.update_user(
+        session,
+        current_user,
+        name=data.name,
+        email=data.email,
+        hashed_password=get_password_hash(data.password) if data.password else None,
+    )
+    await session.commit()
+    await session.refresh(current_user)
+
+    # Always issue a new token so an email change doesn't invalidate the session
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": current_user.email}, expires_delta=access_token_expires
+    )
+
+    return {"user": current_user, "access_token": access_token, "token_type": "bearer"}
 
 
 @router.delete("/me")

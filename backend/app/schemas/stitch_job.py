@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Any
 from datetime import datetime
 from typing import Literal
 from enum import Enum
@@ -116,12 +117,59 @@ class StitchJobOut(BaseModel):
     queued_at: datetime | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    ref_photo_id: str | None = None
     result_s3_key: str | None = None
-    preview_s3_key: str | None = None
     error_message: str | None = None
+    tiles_s3_prefix: str | None = None
+    tiles_metadata: str | None = None
+    tiles_ready: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_orm(cls, data: Any) -> Any:
+        """Handle ORM→schema field name differences when reading from attributes."""
+        import json as _json
+        if not isinstance(data, dict):
+            # ORM object — extract the fields that differ
+            return {
+                "id": data.id,
+                "project_id": data.project_id,
+                "status": data.status,
+                "exp_name": data.exp_name,
+                "ref_name": data.ref_name,
+                "preset_name": data.preset_name,
+                "final_res": [data.final_res_height, data.final_res_width],
+                "save_format": data.save_format,
+                "corner_points": _json.loads(data.corner_points),
+                "relative_scale": data.relative_scale,
+                "photo_ids": _json.loads(data.photo_ids),
+                "attempt": data.attempt,
+                "created_at": data.created_at,
+                "queued_at": data.queued_at,
+                "started_at": data.started_at,
+                "finished_at": data.finished_at,
+                "ref_photo_id": data.ref_photo_id,
+                "result_s3_key": data.result_s3_key,
+                "error_message": data.error_message,
+                "tiles_s3_prefix": data.tiles_s3_prefix,
+                "tiles_metadata": data.tiles_metadata,
+                "tiles_ready": data.tiles_ready,
+            }
+        return data
+
+
+class TileMetadataOut(BaseModel):
+    """Metadata for the Leaflet tile viewer."""
+
+    width: int
+    height: int
+    tile_size: int
+    min_zoom: int
+    max_zoom: int
+    tile_format: str
+    tiles_ready: bool
 
 
 class StitchJobListQuery(BaseModel):

@@ -7,7 +7,7 @@
         Sign In
       </h1>
       <p class="text-sm text-[#6b7280] text-center font-normal leading-relaxed">
-        Sign in to continue creating beautiful blended images
+        Sign in to continue creating blended images
       </p>
     </div>
 
@@ -24,29 +24,30 @@
             v-model="email"
             type="email"
             placeholder="you@example.com"
-            required
             autocomplete="email"
+            @input="clearEmailFieldError"
           />
+          <p v-if="emailError" class="m-0 text-sm text-[#ef4444]">{{ emailError }}</p>
         </div>
 
         <!-- Password -->
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
             <Label for="password" class="font-normal">Password</Label>
-            
           </div>
           <Input
             id="password"
             v-model="password"
             type="password"
             placeholder="Enter your password"
-            required
             autocomplete="current-password"
+            @input="clearPasswordFieldError"
           />
+          <p v-if="passwordError" class="m-0 text-sm text-[#ef4444]">{{ passwordError }}</p>
         </div>
 
-        <!-- Error message -->
-        <p v-if="error" class="m-0 text-sm text-[#ef4444]">{{ error }}</p>
+        <!-- General error (auth failure, network, etc.) -->
+        <p v-if="generalError" class="m-0 text-sm text-[#ef4444]">{{ generalError }}</p>
 
         <!-- Submit -->
         <Button
@@ -73,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { login as apiLogin, getCurrentUser } from '../../api/auth'
 import { authStore } from '../../stores/authStore'
@@ -87,11 +88,62 @@ const router = useRouter()
 const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
-const error = ref<string | null>(null)
+const submitted = ref(false)
+
+// Per-field errors from backend 422 or client validation
+const emailFieldError = ref<string | null>(null)
+const passwordFieldError = ref<string | null>(null)
+const generalError = ref<string | null>(null)
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const emailError = computed(() => {
+  if (emailFieldError.value) return emailFieldError.value
+  if (!submitted.value) return null
+  if (!email.value) return 'Email is required.'
+  if (!EMAIL_RE.test(email.value)) return 'Please enter a valid email address.'
+  return null
+})
+
+const passwordError = computed(() => {
+  if (passwordFieldError.value) return passwordFieldError.value
+  if (!submitted.value) return null
+  if (!password.value) return 'Password is required.'
+  return null
+})
+
+// Reset backend field errors when the user edits the field
+const clearEmailFieldError = () => { emailFieldError.value = null }
+const clearPasswordFieldError = () => { passwordFieldError.value = null }
+
+// Map a FastAPI 422 detail array to field-level messages
+function applyApiValidationErrors(detail: any[]): boolean {
+  let mapped = false
+  for (const err of detail) {
+    const loc: string[] = err.loc ?? []
+    const field = loc[loc.length - 1]
+    if (field === 'email') {
+      emailFieldError.value = 'Please enter a valid email address.'
+      mapped = true
+    } else if (field === 'password') {
+      passwordFieldError.value = 'Password is required.'
+      mapped = true
+    }
+  }
+  return mapped
+}
+
+const isFormValid = computed(() => !emailError.value && !passwordError.value)
 
 const handleLogin = async () => {
+  submitted.value = true
+  emailFieldError.value = null
+  passwordFieldError.value = null
+  generalError.value = null
+
+  if (!isFormValid.value) return
+
   isLoading.value = true
-  error.value = null
 
   try {
     const tokenResponse = await apiLogin({
@@ -108,9 +160,19 @@ const handleLogin = async () => {
   } catch (e: any) {
     console.error(e)
     const status = e?.response?.status
-    error.value = (status === 401 || status === 403)
-      ? 'The login information entered is incorrect'
-      : e?.response?.data?.detail ?? e?.message ?? 'Login failed'
+    const detail = e?.response?.data?.detail
+
+    if (status === 401 || status === 403) {
+      generalError.value = 'The login information entered is incorrect'
+    } else if (status === 422 && Array.isArray(detail)) {
+      if (!applyApiValidationErrors(detail)) {
+        generalError.value = 'Please check your inputs and try again.'
+      }
+    } else if (typeof detail === 'string') {
+      generalError.value = detail
+    } else {
+      generalError.value = e?.message ?? 'Login failed.'
+    }
   } finally {
     isLoading.value = false
   }

@@ -4,4 +4,5 @@ export type PhotoItem = {
   mime: string;
   size: number;
   created_at: string;
+  preview_url: string | null;
 };

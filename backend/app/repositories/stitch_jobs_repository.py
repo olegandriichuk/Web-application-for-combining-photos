@@ -17,6 +17,7 @@ async def create_stitch_job(
     photo_ids: list[str],
     exp_name: str,
     ref_name: str,
+    ref_photo_id: Optional[str],
     preset_name: str,
     final_res: list[int],
     save_format: str,
@@ -31,6 +32,7 @@ async def create_stitch_job(
         status="queued",
         exp_name=exp_name,
         ref_name=ref_name,
+        ref_photo_id=ref_photo_id,
         preset_name=preset_name,
         final_res_height=final_res[0],
         final_res_width=final_res[1],
@@ -52,16 +54,14 @@ async def get_stitch_job(
     return await session.get(StitchJob, job_id)
 
 
-async def get_stitch_job_with_ownership_check(
+async def get_stitch_job_in_project(
     session: AsyncSession,
     job_id: str,
-    user_id: str,
     project_id: str,
 ) -> Optional[StitchJob]:
-    """Get a stitch job only if it belongs to the user and project."""
+    """Get a stitch job only if it belongs to the project."""
     stmt = select(StitchJob).where(
         StitchJob.id == job_id,
-        StitchJob.user_id == user_id,
         StitchJob.project_id == project_id,
     )
     result = await session.execute(stmt)
@@ -72,7 +72,6 @@ async def list_stitch_jobs(
     session: AsyncSession,
     *,
     project_id: str,
-    user_id: str,
     status: Optional[str] = None,
     from_date: Optional[datetime] = None,
     to_date: Optional[datetime] = None,
@@ -87,7 +86,6 @@ async def list_stitch_jobs(
     # Base query
     base_stmt = select(StitchJob).where(
         StitchJob.project_id == project_id,
-        StitchJob.user_id == user_id,
     )
 
     # Apply filters
@@ -159,6 +157,9 @@ async def reset_job_for_requeue(
     job.result_s3_key = None
     job.log_s3_key = None
     job.attempt = 0
+    job.tiles_s3_prefix = None
+    job.tiles_metadata = None
+    job.tiles_ready = False
     await session.flush()
     return job
 

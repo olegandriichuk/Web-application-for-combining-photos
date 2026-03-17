@@ -2,24 +2,21 @@
   <div class="max-w-[1392px] mx-auto mt-6">
 
     <!-- Filters -->
-    <div class="flex gap-3 mb-4">
-      <select
-        v-model="statusFilter"
-        class="py-2 px-3 border border-[rgba(15,23,42,0.12)] rounded-lg text-[13px] text-[#0f172a] bg-[rgba(248,250,252,0.9)] cursor-pointer"
-        @change="onFilterChange"
-      >
-        <option value="">All Statuses</option>
-        <option value="queued">Queued</option>
-        <option value="running">Running</option>
-        <option value="finished">Finished</option>
-        <option value="failed">Failed</option>
-        <option value="canceled">Canceled</option>
-      </select>
+    <div class="flex items-center gap-2 mb-4 flex-wrap">
       <button
-        class="py-2 px-4 border border-[rgba(15,23,42,0.12)] rounded-lg text-[13px] font-medium text-[#0f172a] bg-white cursor-pointer hover:bg-[#f8fafc] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        :disabled="isLoading"
-        @click="loadJobs"
-      >Refresh</button>
+        v-for="opt in statusOptions"
+        :key="opt.value"
+        class="py-[3px] px-[10px] rounded-[20px] text-[11px] font-semibold uppercase tracking-[0.4px] whitespace-nowrap border transition-all cursor-pointer"
+        :class="statusFilter === opt.value ? opt.activeClass : 'bg-white text-[#94a3b8] border-[#e5e7eb] hover:border-[#cbd5e1] hover:text-[#64748b]'"
+        @click="setFilter(opt.value)"
+      >{{ opt.label }}</button>
+      <div class="ml-auto">
+        <button
+          class="h-9 px-4 rounded-md border border-[#e5e7eb] bg-white text-sm font-medium text-[#111827] hover:bg-[#f9fafb] hover:shadow-md transition cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="isLoading"
+          @click="loadJobs"
+        >Refresh</button>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -41,23 +38,23 @@
 
     <!-- Table -->
     <div v-else class="bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full border-collapse">
+      <div class="max-h-[60vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <table class="w-full border-collapse table-fixed">
           <thead>
-            <tr class="bg-[#f8fafc] border-b border-[#e2e8f0]">
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[48px] whitespace-nowrap">#</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] min-w-[150px] whitespace-nowrap">Exp Name</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[110px] whitespace-nowrap">Status</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[155px] whitespace-nowrap">Created</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[155px] whitespace-nowrap">Finished</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[110px] whitespace-nowrap">Preset</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] min-w-[130px] whitespace-nowrap">Reference</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[135px] whitespace-nowrap">Resolution</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[80px] whitespace-nowrap">Format</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[65px] whitespace-nowrap">Scale</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[140px] whitespace-nowrap">Corner Points</th>
-              <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#64748b] min-w-[130px] whitespace-nowrap">Result</th>
-              <th class="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-[#64748b] w-[90px] whitespace-nowrap">Download</th>
+            <tr class="bg-[#f8fafc] border-b border-[#e2e8f0] sticky top-0 z-10">
+              <th class="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[28px]">#</th>
+              <th class="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[8%]">Exp Name</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[80px]">Status</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[11%]">Created</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[11%]">Finished</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[5%]">Preset</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[10%]">Reference</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[7%]">Resolution</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[35px]">Fmt</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[35px]">Scale</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[9%]">Points</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[10%]">Result</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[52px]">↓</th>
             </tr>
           </thead>
           <tbody>
@@ -66,37 +63,39 @@
               :key="job.id"
               class="group border-b border-[rgba(15,23,42,0.06)] hover:bg-[#f8fafc] transition-colors"
             >
-              <td class="px-4 py-3 text-[13px] text-[#94a3b8]">{{ (currentPage - 1) * limit + idx + 1 }}</td>
+              <td class="px-2 py-2 text-[12px] text-[#94a3b8]">{{ (currentPage - 1) * limit + idx + 1 }}</td>
 
-              <td class="px-4 py-3 text-[13px] font-medium text-[#0f172a] max-w-[150px]">
+              <td class="px-2 py-2 text-[12px] font-medium text-[#0f172a]">
                 <span class="block truncate" :title="job.exp_name">{{ job.exp_name }}</span>
               </td>
 
-              <td class="px-4 py-3">
+              <td class="px-2 py-2 text-center">
                 <span
-                  class="py-[2px] px-2 rounded-[20px] text-[11px] font-semibold uppercase tracking-[0.4px] whitespace-nowrap"
+                  class="py-[2px] px-[6px] rounded-[20px] text-center text-[10px] font-semibold uppercase tracking-[0.4px] whitespace-nowrap"
                   :class="statusClass(job.status)"
                 >{{ job.status }}</span>
               </td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569] whitespace-nowrap">{{ formatDate(job.created_at) }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">{{ formatDate(job.created_at) }}</td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569] whitespace-nowrap">{{ job.finished_at ? formatDate(job.finished_at) : '—' }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">{{ job.finished_at ? formatDate(job.finished_at) : '-' }}</td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569]">{{ job.preset_name }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">
+                <span class="block truncate" :title="job.preset_name">{{ job.preset_name }}</span>
+              </td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569] max-w-[130px]">
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">
                 <span class="block truncate" :title="job.ref_name">{{ job.ref_name }}</span>
               </td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569] whitespace-nowrap">{{ job.final_res[1] }} × {{ job.final_res[0] }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569] whitespace-nowrap">{{ job.final_res[1] }}×{{ job.final_res[0] }}</td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569] uppercase">{{ job.save_format }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569] uppercase">{{ job.save_format }}</td>
 
-              <td class="px-4 py-3 text-[13px] text-[#475569]">{{ job.relative_scale }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">{{ job.relative_scale }}</td>
 
               <!-- Corner Points -->
-              <td class="px-4 py-3 text-[13px] text-[#475569] max-w-[140px]">
+              <td class="px-2 py-2 text-[11px] text-[#475569]">
                 <span
                   class="block truncate cursor-default underline decoration-dotted decoration-[#94a3b8] underline-offset-2"
                   @mouseenter="showCornerTooltip($event, job.corner_points)"
@@ -106,26 +105,34 @@
               </td>
 
               <!-- Result -->
-              <td class="px-4 py-3">
-                <button
-                  v-if="job.status === 'finished'"
-                  class="py-1 px-3 rounded-lg text-[12px] font-semibold bg-[rgba(73,84,231,0.08)] text-[#4954E7] border border-[rgba(73,84,231,0.2)] hover:bg-[rgba(73,84,231,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
-                  disabled
-                >View result</button>
+              <td class="px-2 py-2 text-center">
+                <template v-if="job.status === 'finished'">
+                  <button
+                    v-if="job.tiles_ready"
+                    class="py-[2px] px-2 rounded-lg text-center text-[11px] font-semibold bg-[rgba(73,84,231,0.08)] text-[#4954E7] border border-[rgba(73,84,231,0.2)] hover:bg-[rgba(73,84,231,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+                    :disabled="openingViewer[job.id]"
+                    @click="openViewer(job)"
+                  >{{ openingViewer[job.id] ? 'Loading…' : 'View result' }}</button>
+                  <span
+                    v-else
+                    class="text-center text-[11px] text-[#94a3b8] whitespace-nowrap"
+                    title="Tile generation in progress"
+                  >Generating…</span>
+                </template>
                 <div v-else-if="job.status === 'failed'" class="flex items-center gap-1 min-w-0">
                   <button
-                    class="shrink-0 w-6 h-6 flex items-center justify-center rounded border border-[rgba(185,28,28,0.2)] bg-[rgba(185,28,28,0.05)] text-[#b91c1c] hover:bg-[rgba(185,28,28,0.12)] transition-colors cursor-pointer"
+                    class="shrink-0 w-5 h-5 flex items-center justify-center rounded border border-[rgba(185,28,28,0.2)] bg-[rgba(185,28,28,0.05)] text-[#b91c1c] hover:bg-[rgba(185,28,28,0.12)] transition-colors cursor-pointer"
                     :title="copiedId === job.id ? 'Copied!' : 'Copy error message'"
                     @click="copyText(job.id, job.error_message ?? 'Job failed')"
                   >
-                    <span v-if="copiedId === job.id" class="text-[10px] font-semibold leading-none">✓</span>
-                    <svg v-else width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <span v-if="copiedId === job.id" class="text-[9px] font-semibold leading-none">✓</span>
+                    <svg v-else width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
                       <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2H3.5A1.5 1.5 0 0 0 2 3.5V9.5A1.5 1.5 0 0 0 3.5 11H5" stroke="currentColor" stroke-width="1.5"/>
                     </svg>
                   </button>
                   <span
-                    class="text-[12px] text-[#b91c1c] block truncate max-w-[130px] cursor-default underline decoration-dotted decoration-[#b91c1c] underline-offset-2"
+                    class="text-[11px] text-[#b91c1c] block truncate cursor-default underline decoration-dotted decoration-[#b91c1c] underline-offset-2"
                     @mouseenter="showErrorTooltip($event, job.error_message)"
                     @mousemove="moveTooltip"
                     @mouseleave="hideTooltip"
@@ -134,15 +141,15 @@
               </td>
 
               <!-- Download -->
-              <td class="px-4 py-3 text-center">
+              <td class="px-2 py-2 text-center">
                 <button
                   v-if="job.status === 'finished'"
-                  class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(16,185,129,0.08)] text-[#065f46] border border-[rgba(16,185,129,0.2)] hover:bg-[rgba(16,185,129,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[16px]"
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[rgba(16,185,129,0.08)] text-[#065f46] border border-[rgba(16,185,129,0.2)] hover:bg-[rgba(16,185,129,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[14px]"
                   :disabled="loadingResult[job.id]"
                   title="Download result"
                   @click="openDownload(job)"
                 >↓</button>
-                <span v-else class="text-[13px] text-[#94a3b8]">—</span>
+                <span v-else class="text-[12px] text-[#94a3b8]">-</span>
               </td>
             </tr>
           </tbody>
@@ -202,12 +209,24 @@
       </div>
     </div>
   </Teleport>
+
+  <!-- Leaflet Viewer Modal -->
+  <LeafletViewer
+    v-if="viewer.open"
+    :project-id="viewer.projectId"
+    :job-id="viewer.jobId"
+    :metadata="viewer.metadata!"
+    :title="viewer.title"
+    :download-url="viewer.downloadUrl"
+    @close="viewer.open = false"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { listStitchJobs, getJobResult } from '../api/stitchJobs'
-import { type StitchJob, type JobStatus } from '../types/stitchJob'
+import { listStitchJobs, getJobResult, getJobTileMetadata } from '../api/stitchJobs'
+import { type StitchJob, type JobStatus, type TileMetadata } from '../types/stitchJob'
+import LeafletViewer from './LeafletViewer.vue'
 
 const props = defineProps<{
   projectId: string
@@ -219,11 +238,29 @@ const error = ref<string | null>(null)
 
 const statusFilter = ref<JobStatus | ''>('')
 const currentPage = ref(1)
+
+const statusOptions = [
+  { value: '',         label: 'All',      activeClass: 'bg-[#e2e8f0] text-[#475569] border-[#cbd5e1]' },
+  { value: 'queued',   label: 'Queued',   activeClass: 'bg-[#e2e8f0] text-[#475569] border-[#cbd5e1]' },
+  { value: 'running',  label: 'Running',  activeClass: 'bg-[#dbeafe] text-[#1d4ed8] border-[#bfdbfe]' },
+  { value: 'finished', label: 'Finished', activeClass: 'bg-[#dcfce7] text-[#15803d] border-[#bbf7d0]' },
+  { value: 'failed',   label: 'Failed',   activeClass: 'bg-[#fee2e2] text-[#b91c1c] border-[#fecaca]' },
+] as const
+
+const setFilter = (value: JobStatus | '') => {
+  statusFilter.value = value
+  currentPage.value = 1
+  loadJobs()
+}
 const totalPages = ref(1)
 const limit = 10
 
 const hasActiveJobs = computed(() =>
-  jobs.value.some(j => j.status === 'queued' || j.status === 'running')
+  jobs.value.some(j =>
+    j.status === 'queued' ||
+    j.status === 'running' ||
+    (j.status === 'finished' && !j.tiles_ready)
+  )
 )
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -255,10 +292,6 @@ const loadJobs = async () => {
   }
 }
 
-const onFilterChange = () => {
-  currentPage.value = 1
-  loadJobs()
-}
 
 const goToPage = (page: number) => {
   if (page >= 1 && page <= totalPages.value) {
@@ -273,7 +306,6 @@ const statusClass = (status: JobStatus): string => {
     running:  'bg-[#dbeafe] text-[#1d4ed8]',
     finished: 'bg-[#dcfce7] text-[#15803d]',
     failed:   'bg-[#fee2e2] text-[#b91c1c]',
-    canceled: 'bg-[#e2e8f0] text-[#475569]',
   }
   return map[status] ?? ''
 }
@@ -338,7 +370,7 @@ const copyText = async (jobId: string, text: string) => {
 
 // ── Result fetching ───────────────────────────────────────────────────────────
 
-type ResultUrls = { download_url: string; preview_url: string | null }
+type ResultUrls = { download_url: string }
 const resultUrls = ref<Record<string, ResultUrls>>({})
 const loadingResult = ref<Record<string, boolean>>({})
 
@@ -359,6 +391,51 @@ const openDownload = async (job: StitchJob) => {
   const urls = resultUrls.value[job.id]
   if (!urls) return
   window.open(urls.download_url, '_blank')
+}
+
+// ── Leaflet viewer ────────────────────────────────────────────────────────────
+
+type ViewerState = {
+  open: boolean
+  projectId: string
+  jobId: string
+  metadata: TileMetadata | null
+  title: string
+  downloadUrl: string | undefined
+}
+
+const viewer = ref<ViewerState>({
+  open: false,
+  projectId: '',
+  jobId: '',
+  metadata: null,
+  title: '',
+  downloadUrl: undefined,
+})
+
+const openingViewer = ref<Record<string, boolean>>({})
+
+const openViewer = async (job: StitchJob) => {
+  if (openingViewer.value[job.id]) return
+  openingViewer.value[job.id] = true
+  try {
+    const [metadata] = await Promise.all([
+      getJobTileMetadata(props.projectId, job.id),
+      fetchResult(job),
+    ])
+    viewer.value = {
+      open: true,
+      projectId: props.projectId,
+      jobId: job.id,
+      metadata,
+      title: job.exp_name,
+      downloadUrl: resultUrls.value[job.id]?.download_url,
+    }
+  } catch (e) {
+    console.error('Failed to open viewer for job', job.id, e)
+  } finally {
+    openingViewer.value[job.id] = false
+  }
 }
 
 watch(() => props.projectId, () => {

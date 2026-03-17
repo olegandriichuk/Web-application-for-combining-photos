@@ -17,6 +17,8 @@ import asyncio
 import io
 import json
 import logging
+import math
+import os
 import shutil
 import time
 from datetime import datetime, timezone
@@ -25,9 +27,10 @@ from pathlib import Path
 
 from .config import settings
 from .database import async_session_maker
-from .models.user import User as _User          # noqa: F401 – register with SQLAlchemy
-from .models.project import Project as _Project  # noqa: F401
-from .models.photo import Photo as _Photo        # noqa: F401
+from .models.user import User as _User                          # noqa: F401 – register with SQLAlchemy
+from .models.project import Project as _Project                  # noqa: F401
+from .models.photo import Photo as _Photo                        # noqa: F401
+from .models.project_member import ProjectMember as _PM          # noqa: F401
 from .models.stitch_job import StitchJob
 from .repositories import stitch_jobs_repository, photos_repository
 from .services.redis_service import redis_service
@@ -55,7 +58,6 @@ async def _update_job(
     started_at: datetime | None = None,
     finished_at: datetime | None = None,
     result_s3_key: str | None = None,
-    preview_s3_key: str | None = None,
     log_s3_key: str | None = None,
     error_message: str | None = None,
     attempt: int | None = None,
@@ -72,14 +74,29 @@ async def _update_job(
             job.finished_at = finished_at
         if result_s3_key is not None:
             job.result_s3_key = result_s3_key
-        if preview_s3_key is not None:
-            job.preview_s3_key = preview_s3_key
         if log_s3_key is not None:
             job.log_s3_key = log_s3_key
         if error_message is not None:
             job.error_message = error_message
         if attempt is not None:
             job.attempt = attempt
+        await session.commit()
+
+
+async def _update_job_tiles(
+    job_id: str,
+    *,
+    tiles_s3_prefix: str,
+    tiles_metadata: str,
+) -> None:
+    """Persist tile fields after successful tile generation."""
+    async with async_session_maker() as session:
+        job = await stitch_jobs_repository.get_stitch_job(session, job_id)
+        if job is None:
+            return
+        job.tiles_s3_prefix = tiles_s3_prefix
+        job.tiles_metadata = tiles_metadata
+        job.tiles_ready = True
         await session.commit()
 
 
@@ -121,52 +138,84 @@ def _build_exposea_config_yaml(job: StitchJob) -> str:
     )
 
 
-# ── preview generation ────────────────────────────────────────────
+# ── tile generation ───────────────────────────────────────────────
 
-PREVIEW_MAX_PX = 2048  # longest edge of the JPEG preview
+TILE_SIZE = 256
 
 
-def _generate_preview(result_path: Path) -> bytes:
+def _generate_tiles_pil(src_path: Path, output_dir: Path) -> tuple[int, int, int]:
     """
-    Convert *result_path* to a JPEG preview using ImageMagick.
-    Handles formats Pillow cannot (e.g. SGILOG-compressed TIFF from Exposea).
-    Runs synchronously; call via asyncio.to_thread.
+    Generate a tile pyramid from *src_path* using Pillow.
+    Falls back to ImageMagick for format conversion if Pillow can't open the file.
+    Returns (width, height, max_zoom).
     """
+    from PIL import Image
     import subprocess
     import tempfile
 
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-
+    # Try Pillow first; fall back to ImageMagick conversion for SGILOG TIFF etc.
+    img = None
+    tmp_png: Path | None = None
     try:
+        img = Image.open(src_path)
+        img.load()
+    except Exception:
+        # Convert via ImageMagick to a temporary PNG
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp_png = Path(tmp.name)
         subprocess.run(
-            [
-                "convert",
-                str(result_path),
-                "-gamma", "2.2",
-                "-resize", f"{PREVIEW_MAX_PX}x{PREVIEW_MAX_PX}>",
-                "-quality", "85",
-                str(tmp_path),
-            ],
+            ["convert", str(src_path), "-gamma", "2.2", str(tmp_png)],
             check=True,
             capture_output=True,
         )
-        return tmp_path.read_bytes()
+        img = Image.open(tmp_png)
+        img.load()
+
+    try:
+        width, height = img.size
+        max_zoom = max(0, math.ceil(math.log2(max(width, height) / TILE_SIZE)))
+        max_zoom = min(max_zoom, 10)  # cap at zoom 10
+
+        for z in range(max_zoom + 1):
+            scale = 2 ** (max_zoom - z)
+            scaled_w = max(1, width // scale)
+            scaled_h = max(1, height // scale)
+            scaled = img.resize((scaled_w, scaled_h), Image.LANCZOS)
+            cols = math.ceil(scaled_w / TILE_SIZE)
+            rows = math.ceil(scaled_h / TILE_SIZE)
+            for x in range(cols):
+                for y in range(rows):
+                    box = (
+                        x * TILE_SIZE,
+                        y * TILE_SIZE,
+                        min((x + 1) * TILE_SIZE, scaled_w),
+                        min((y + 1) * TILE_SIZE, scaled_h),
+                    )
+                    tile = Image.new("RGB", (TILE_SIZE, TILE_SIZE), (255, 255, 255))
+                    cropped = scaled.crop(box)
+                    tile.paste(cropped, (0, 0))
+                    tile_path = output_dir / str(z) / str(x) / f"{y}.jpg"
+                    tile_path.parent.mkdir(parents=True, exist_ok=True)
+                    tile.save(tile_path, "JPEG", quality=85)
     finally:
-        tmp_path.unlink(missing_ok=True)
+        img.close()
+        if tmp_png and tmp_png.exists():
+            tmp_png.unlink(missing_ok=True)
+
+    return width, height, max_zoom
 
 
 # ── job processing ────────────────────────────────────────────────
 
 _active_jobs: set[str] = set()  # job IDs currently being processed by this worker
+_job_semaphore = asyncio.Semaphore(1)  # allow only 1 concurrent job per worker process
 
 
 async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> None:
     """
-    Full lifecycle of a single stitch job:
+Full lifecycle of a single stitch job:
       1. Load from DB
-      2. Skip if canceled
-      3. Mark RUNNING
+      2. Mark RUNNING
       4. Download photos from S3
       5. Generate Exposea YAML config
       6. Run `python register.py -i <task_dir> -o <output_dir>` from EXPOSEA_PATH
@@ -282,11 +331,13 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
             )
 
         # ── Find and upload result ────────────────────────────────
+        _RESULT_SUFFIXES = {".tiff", ".tif", ".j2k", ".jp2"}
         result_files = [
-            f for f in output_dir.rglob("*") if f.is_file()
+            f for f in output_dir.rglob("*")
+            if f.is_file() and f.suffix.lower() in _RESULT_SUFFIXES
         ]
         if not result_files:
-            raise RuntimeError("Exposea produced no output files")
+            raise RuntimeError("Exposea produced no output files with expected extensions (.tiff, .tif, .j2k, .jp2)")
 
         result_file = result_files[0]
         result_bytes = result_file.read_bytes()
@@ -295,25 +346,57 @@ async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> Non
         await s3_service.upload_file(result_bytes, s3_key)
         logger.info("[%s] Uploaded result to s3://%s (%d bytes)", msg_id, s3_key, len(result_bytes))
 
-        # ── Generate JPEG preview ─────────────────────────────────
-        preview_s3_key: str | None = None
-        try:
-            preview_bytes = await asyncio.to_thread(_generate_preview, result_file)
-            preview_s3_key = f"stitch-results/{job.project_id}/{job.id}/preview.jpg"
-            await s3_service.upload_file(preview_bytes, preview_s3_key, content_type="image/jpeg")
-            logger.info("[%s] Uploaded preview to s3://%s (%d bytes)", msg_id, preview_s3_key, len(preview_bytes))
-        except Exception as prev_exc:
-            logger.warning("[%s] Preview generation failed (non-fatal): %s", msg_id, prev_exc)
-
         # ── Mark FINISHED ─────────────────────────────────────────
         await _update_job(
             job_id,
             status="finished",
             finished_at=datetime.now(timezone.utc),
             result_s3_key=s3_key,
-            preview_s3_key=preview_s3_key,
             error_message="",
         )
+
+        # ── Generate tile pyramid ─────────────────────────────────
+        try:
+            tile_dir = work_root / "tiles"
+            tile_dir.mkdir(parents=True, exist_ok=True)
+            img_width, img_height, max_zoom = await asyncio.to_thread(
+                _generate_tiles_pil, result_file, tile_dir
+            )
+            tiles_s3_prefix = f"stitch-tiles/{job.project_id}/{job.id}"
+
+            # Upload all generated tile files to S3
+            for tile_path in tile_dir.rglob("*.jpg"):
+                rel = tile_path.relative_to(tile_dir)
+                tile_s3_key = f"{tiles_s3_prefix}/{rel.as_posix()}"
+                tile_bytes = tile_path.read_bytes()
+                await s3_service.upload_file(tile_bytes, tile_s3_key, content_type="image/jpeg")
+
+            # Build and upload metadata
+            meta = {
+                "width": img_width,
+                "height": img_height,
+                "tile_size": TILE_SIZE,
+                "min_zoom": 0,
+                "max_zoom": max_zoom,
+                "tile_format": "jpg",
+                "tiles_ready": True,
+            }
+            meta_bytes = json.dumps(meta).encode()
+            await s3_service.upload_file(
+                meta_bytes, f"{tiles_s3_prefix}/metadata.json", content_type="application/json"
+            )
+
+            await _update_job_tiles(
+                job_id,
+                tiles_s3_prefix=tiles_s3_prefix,
+                tiles_metadata=json.dumps(meta),
+            )
+            logger.info(
+                "[%s] Tile pyramid ready: %dx%d px, zoom 0-%d, prefix=%s",
+                msg_id, img_width, img_height, max_zoom, tiles_s3_prefix,
+            )
+        except Exception as tile_exc:
+            logger.warning("[%s] Tile generation failed (non-fatal): %s", msg_id, tile_exc)
         await redis_service.ack(msg_id)
         elapsed = time.monotonic() - t0
         logger.info("[%s] Job %s FINISHED in %.1fs", msg_id, job_id, elapsed)
@@ -349,7 +432,8 @@ async def reclaim_loop() -> None:
                 if not job_id:
                     await redis_service.ack(msg_id)
                     continue
-                await process_job(job_id, msg_id, is_reclaim=True)
+                async with _job_semaphore:
+                    await process_job(job_id, msg_id, is_reclaim=True)
         except Exception:
             logger.exception("Error in reclaim loop")
 
@@ -379,7 +463,8 @@ async def main() -> None:
                         logger.warning("Message %s has no job_id – acking", msg_id)
                         await redis_service.ack(msg_id)
                         continue
-                    await process_job(job_id, msg_id)
+                    async with _job_semaphore:
+                        await process_job(job_id, msg_id)
             except Exception:
                 logger.exception("Error in consumer loop – retrying in 5s")
                 await asyncio.sleep(5)
