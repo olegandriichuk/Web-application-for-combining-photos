@@ -6,7 +6,6 @@ import uuid
 import json
 
 from ..models.stitch_job import StitchJob
-from ..schemas.stitch_job import JobStatus
 
 
 async def create_stitch_job(
@@ -116,32 +115,6 @@ async def list_stitch_jobs(
     return jobs, total
 
 
-async def update_stitch_job_status(
-    session: AsyncSession,
-    job: StitchJob,
-    status: str,
-    *,
-    started_at: Optional[datetime] = None,
-    finished_at: Optional[datetime] = None,
-    result_s3_key: Optional[str] = None,
-    log_s3_key: Optional[str] = None,
-    error_message: Optional[str] = None,
-) -> StitchJob:
-    """Update stitch job status and related fields."""
-    job.status = status
-    if started_at is not None:
-        job.started_at = started_at
-    if finished_at is not None:
-        job.finished_at = finished_at
-    if result_s3_key is not None:
-        job.result_s3_key = result_s3_key
-    if log_s3_key is not None:
-        job.log_s3_key = log_s3_key
-    if error_message is not None:
-        job.error_message = error_message
-    await session.flush()
-    return job
-
 
 async def reset_job_for_requeue(
     session: AsyncSession,
@@ -164,9 +137,3 @@ async def reset_job_for_requeue(
     return job
 
 
-async def delete_stitch_job(
-    session: AsyncSession,
-    job: StitchJob
-) -> None:
-    """Delete a stitch job."""
-    await session.delete(job)

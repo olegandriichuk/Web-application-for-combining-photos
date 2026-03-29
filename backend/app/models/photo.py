@@ -14,6 +14,8 @@ class Photo(Base):
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     preview_s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    original_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    original_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user = relationship("User", back_populates="photos")
     project = relationship("Project", back_populates="photos")

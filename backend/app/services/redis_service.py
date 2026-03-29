@@ -81,6 +81,8 @@ class RedisService:
             message_id = await client.xadd(
                 settings.stream_key,
                 {"job_id": str(job_id)},
+                maxlen=10000,
+                approximate=True,
             )
             logger.info("Enqueued job %s → message %s", job_id, message_id)
             return message_id
@@ -119,6 +121,88 @@ class RedisService:
         client = await self.get_client()
         if client:
             await client.xack(settings.stream_key, settings.consumer_group, message_id)
+
+    # ── Distributed lock ──────────────────────────────────────────
+
+    # Short TTL: the heartbeat refreshes it every 3 min while the job runs.
+    # After a crash (no heartbeat) it expires on its own within this window,
+    # allowing another worker to pick up the job at the next reclaim cycle.
+    LOCK_TTL_SECONDS = 600  # 10 minutes
+
+    async def acquire_job_lock(self, job_id: str) -> bool:
+        """
+        Acquire an exclusive lock for job_id using SET NX EX.
+        Returns True if the lock was acquired, False if another worker holds it.
+        If Redis is disabled, always returns True (single-worker assumption).
+        """
+        client = await self.get_client()
+        if client is None:
+            return True
+        key = f"job:{job_id}:lock"
+        result = await client.set(key, settings.consumer_name, nx=True, ex=self.LOCK_TTL_SECONDS)
+        return result is not None
+
+    async def refresh_job_lock(self, job_id: str) -> None:
+        """
+        Reset the lock TTL if this worker still owns it (atomic Lua EXPIRE).
+        Called by the heartbeat loop every HEARTBEAT_INTERVAL seconds.
+        """
+        client = await self.get_client()
+        if client is None:
+            return
+        lua = """
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("expire", KEYS[1], ARGV[2])
+        else
+            return 0
+        end
+        """
+        try:
+            await client.eval(
+                lua, 1, f"job:{job_id}:lock", settings.consumer_name, str(self.LOCK_TTL_SECONDS)
+            )
+        except Exception as exc:
+            logger.warning("Failed to refresh lock for job %s: %s", job_id, exc)
+
+    async def refresh_message_claim(self, msg_id: str) -> None:
+        """
+        Reset the PEL idle timer by reclaiming the message to ourselves.
+        Called by the heartbeat loop so XAUTOCLAIM does not reclaim a job
+        that is still actively running.
+        """
+        client = await self.get_client()
+        if client is None:
+            return
+        try:
+            await client.xclaim(
+                settings.stream_key,
+                settings.consumer_group,
+                settings.consumer_name,
+                min_idle_time=0,  # claim regardless of idle time
+                message_ids=[msg_id],
+            )
+        except Exception as exc:
+            logger.warning("Failed to refresh claim for message %s: %s", msg_id, exc)
+
+    async def release_job_lock(self, job_id: str) -> None:
+        """
+        Release the lock only if this worker owns it (atomic Lua check-and-delete).
+        Safe to call even if the lock has already expired or was never acquired.
+        """
+        client = await self.get_client()
+        if client is None:
+            return
+        lua = """
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("del", KEYS[1])
+        else
+            return 0
+        end
+        """
+        try:
+            await client.eval(lua, 1, f"job:{job_id}:lock", settings.consumer_name)
+        except Exception:
+            pass  # lock expired or Redis unavailable — safe to ignore
 
     # ── Pending reclaim ───────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 <template>
-  <div class="max-w-[1392px] mx-auto mt-6">
+  <div class="max-w-90% mx-auto mt-6 flex flex-col flex-1 min-h-0">
 
     <!-- Filters -->
-    <div class="flex items-center gap-2 mb-4 flex-wrap">
+    <div class="flex items-center gap-2 mb-4 flex-wrap flex-shrink-0">
       <button
         v-for="opt in statusOptions"
         :key="opt.value"
@@ -37,20 +37,20 @@
     </div>
 
     <!-- Table -->
-    <div v-else class="bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden">
-      <div class="max-h-[60vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div v-else class="bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col flex-1 min-h-0">
+      <div class="flex-1 min-h-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <table class="w-full border-collapse table-fixed">
           <thead>
             <tr class="bg-[#f8fafc] border-b border-[#e2e8f0] sticky top-0 z-10">
               <th class="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[28px]">#</th>
-              <th class="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[8%]">Exp Name</th>
+              <th class="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[8%]">Experiment Name</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[80px]">Status</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[11%]">Created</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[11%]">Finished</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[5%]">Preset</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[10%]">Reference</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[7%]">Resolution</th>
-              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[35px]">Fmt</th>
+              <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[35px]">Format</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[35px]">Scale</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[9%]">Points</th>
               <th class="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748b] w-[10%]">Result</th>
@@ -88,14 +88,14 @@
                 <span class="block truncate" :title="job.ref_name">{{ job.ref_name }}</span>
               </td>
 
-              <td class="px-2 py-2 text-center text-[11px] text-[#475569] whitespace-nowrap">{{ job.final_res[1] }}×{{ job.final_res[0] }}</td>
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569] whitespace-nowrap">{{ job.final_res[0] }}×{{ job.final_res[1] }}</td>
 
               <td class="px-2 py-2 text-center text-[11px] text-[#475569] uppercase">{{ job.save_format }}</td>
 
               <td class="px-2 py-2 text-center text-[11px] text-[#475569]">{{ job.relative_scale }}</td>
 
               <!-- Corner Points -->
-              <td class="px-2 py-2 text-[11px] text-[#475569]">
+              <td class="px-2 py-2 text-center text-[11px] text-[#475569]">
                 <span
                   class="block truncate cursor-default underline decoration-dotted decoration-[#94a3b8] underline-offset-2"
                   @mouseenter="showCornerTooltip($event, job.corner_points)"
@@ -142,14 +142,22 @@
 
               <!-- Download -->
               <td class="px-2 py-2 text-center">
-                <button
-                  v-if="job.status === 'finished'"
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[rgba(16,185,129,0.08)] text-[#065f46] border border-[rgba(16,185,129,0.2)] hover:bg-[rgba(16,185,129,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[14px]"
-                  :disabled="loadingResult[job.id]"
-                  title="Download result"
-                  @click="openDownload(job)"
-                >↓</button>
-                <span v-else class="text-[12px] text-[#94a3b8]">-</span>
+                <div class="flex items-center justify-center gap-1">
+                  <button
+                    v-if="job.status === 'finished'"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[rgba(16,185,129,0.08)] text-[#065f46] border border-[rgba(16,185,129,0.2)] hover:bg-[rgba(16,185,129,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[14px]"
+                    :disabled="loadingResult[job.id]"
+                    title="Download result"
+                    @click="openDownload(job)"
+                  >↓</button>
+                  <button
+                    v-if="job.status === 'failed' && job.log_s3_key"
+                    class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[rgba(185,28,28,0.08)] text-[#b91c1c] border border-[rgba(185,28,28,0.2)] hover:bg-[rgba(185,28,28,0.14)] transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[14px]"
+                    title="Download logs"
+                    @click="openLogDownload(job)"
+                  >↓</button>
+                  <span v-if="job.status !== 'finished' && !(job.status === 'failed' && job.log_s3_key)" class="text-[12px] text-[#94a3b8]">-</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -202,10 +210,10 @@
       <!-- Error tooltip -->
       <div
         v-else-if="tooltip.type === 'error'"
-        class="bg-white rounded-[10px] border border-[rgba(239,68,68,0.2)] shadow-[0_4px_16px_rgba(15,23,42,0.12)] px-4 py-3 max-w-[320px]"
+        class="bg-white rounded-[10px] border border-[rgba(239,68,68,0.2)] shadow-[0_4px_16px_rgba(15,23,42,0.12)] px-4 py-3 max-w-[480px]"
       >
         <p class="m-0 mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#b91c1c]">Error Details</p>
-        <p class="m-0 text-[13px] text-[#0f172a] leading-5 break-words">{{ tooltip.data ?? 'Job failed' }}</p>
+        <p class="m-0 text-[12px] text-[#0f172a] leading-5 break-words font-mono whitespace-pre-wrap">{{ tooltip.data ?? 'Job failed' }}</p>
       </div>
     </div>
   </Teleport>
@@ -224,7 +232,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { listStitchJobs, getJobResult, getJobTileMetadata } from '../api/stitchJobs'
+import { listStitchJobs, getJobResult, getJobLog, getJobTileMetadata } from '../api/stitchJobs'
 import { type StitchJob, type JobStatus, type TileMetadata } from '../types/stitchJob'
 import LeafletViewer from './LeafletViewer.vue'
 
@@ -253,7 +261,15 @@ const setFilter = (value: JobStatus | '') => {
   loadJobs()
 }
 const totalPages = ref(1)
-const limit = 10
+
+// Show more rows on taller screens: ~38px per row, ~260px overhead (header + filters + pagination)
+const limit = computed(() => {
+  const h = window.innerHeight
+  if (h >= 1200) return 20
+  if (h >= 900)  return 15
+  if (h >= 700)  return 8
+  return 8
+})
 
 const hasActiveJobs = computed(() =>
   jobs.value.some(j =>
@@ -279,7 +295,7 @@ const loadJobs = async () => {
   isLoading.value = true
   error.value = null
   try {
-    const params: Record<string, any> = { page: currentPage.value, limit, sort: 'startDateDesc' }
+    const params: Record<string, any> = { page: currentPage.value, limit: limit.value, sort: 'startDateDesc' }
     if (statusFilter.value) params.status = statusFilter.value
     const response = await listStitchJobs(props.projectId, params)
     jobs.value = response.items
@@ -365,6 +381,29 @@ const copyText = async (jobId: string, text: string) => {
     setTimeout(() => { copiedId.value = null }, 2000)
   } catch (e) {
     console.error('Failed to copy:', e)
+  }
+}
+
+// ── Log download ──────────────────────────────────────────────────────────────
+
+const loadingLog = ref<Record<string, boolean>>({})
+
+const openLogDownload = async (job: StitchJob) => {
+  if (loadingLog.value[job.id]) return
+  loadingLog.value[job.id] = true
+  try {
+    const { log_url } = await getJobLog(props.projectId, job.id)
+    const blob = await fetch(log_url).then(r => r.blob())
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `${job.exp_name}-${job.id}.txt`
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+  } catch (e) {
+    console.error('Failed to get log URL:', e)
+  } finally {
+    loadingLog.value[job.id] = false
   }
 }
 

@@ -45,7 +45,7 @@
                 @change="handleRoleChange(member, ($event.target as HTMLSelectElement).value as 'editor' | 'viewer')"
               >
                 <option value="editor">Editor</option>
-                <option value="viewer">Viewer</option>
+                <option v-if="isPrivate" value="viewer">Viewer</option>
               </select>
               <!-- Remove button — hidden for own row -->
               <button
@@ -76,7 +76,7 @@
             class="text-[13px] border border-[#e5e7eb] rounded-md px-2 py-[7px] bg-white text-[#374151] cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#3b82f6]"
           >
             <option value="editor">Editor</option>
-            <option value="viewer">Viewer</option>
+            <option v-if="isPrivate" value="viewer">Viewer</option>
           </select>
           <button
             type="button"
@@ -100,6 +100,7 @@ import type { ProjectMember } from '@/types/projectMember'
 const props = defineProps<{
   projectId: string
   currentUserId: string
+  isPrivate: boolean
 }>()
 
 const emit = defineEmits<{ close: [] }>()

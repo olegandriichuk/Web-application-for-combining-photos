@@ -1,6 +1,6 @@
 <template>
   <div class="py-12 px-4 pb-16">
-    <div class="max-w-[1392px] mx-auto mb-7">
+    <div class="max-w-90% mx-auto mb-7">
       <div class="flex items-center justify-between mb-[14px]">
         <button
           @click="goBackToProjects"

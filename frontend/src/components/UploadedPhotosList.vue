@@ -46,7 +46,10 @@
           >
             <span v-if="refPhotoId === p.id" class="w-2 h-2 rounded-full bg-white block"></span>
           </button>
-          <p class="m-0 text-sm text-[#111827] font-medium truncate flex-1">{{ p.original_name }}</p>
+          <div class="flex flex-col min-w-0 flex-1">
+            <p class="m-0 text-sm text-[#111827] font-medium truncate">{{ p.original_name }}</p>
+            <p v-if="refPhotoId === p.id" class="m-0 text-[11px] text-[#4954E7] font-semibold">Reference image</p>
+          </div>
         </div>
 
       </article>

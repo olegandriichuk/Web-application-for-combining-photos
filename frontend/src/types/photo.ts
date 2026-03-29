@@ -5,4 +5,6 @@ export type PhotoItem = {
   size: number;
   created_at: string;
   preview_url: string | null;
+  original_width: number | null;
+  original_height: number | null;
 };

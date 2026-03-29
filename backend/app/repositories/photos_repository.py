@@ -15,6 +15,8 @@ async def create_photo_meta(
     user_id: str,
     project_id: str,
     preview_s3_key: str | None = None,
+    original_width: int | None = None,
+    original_height: int | None = None,
 ) -> Photo:
     obj = Photo(
         id=id,
@@ -25,6 +27,8 @@ async def create_photo_meta(
         user_id=user_id,
         project_id=project_id,
         preview_s3_key=preview_s3_key,
+        original_width=original_width,
+        original_height=original_height,
     )
     session.add(obj)
     await session.flush()

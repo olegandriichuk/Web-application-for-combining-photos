@@ -7,12 +7,9 @@ from enum import Enum
 
 class PresetName(str, Enum):
     """Allowed preset configuration names."""
-    DEBUG = "debug"
-    DEFAULT = "default"
     P_100MPX = "p_100mpx"
     P_200MPX = "p_200mpx"
     P_400MPX = "p_400mpx"
-    P_NORMAL = "p_normal"
 
 
 class SaveFormat(str, Enum):
@@ -119,6 +116,7 @@ class StitchJobOut(BaseModel):
     finished_at: datetime | None = None
     ref_photo_id: str | None = None
     result_s3_key: str | None = None
+    log_s3_key: str | None = None
     error_message: str | None = None
     tiles_s3_prefix: str | None = None
     tiles_metadata: str | None = None
@@ -152,6 +150,7 @@ class StitchJobOut(BaseModel):
                 "finished_at": data.finished_at,
                 "ref_photo_id": data.ref_photo_id,
                 "result_s3_key": data.result_s3_key,
+                "log_s3_key": data.log_s3_key,
                 "error_message": data.error_message,
                 "tiles_s3_prefix": data.tiles_s3_prefix,
                 "tiles_metadata": data.tiles_metadata,

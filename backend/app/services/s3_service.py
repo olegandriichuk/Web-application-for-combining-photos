@@ -170,44 +170,6 @@ class S3Service:
             logger.error(f"Failed to list objects by prefix {prefix}: {e}")
         return keys
 
-    async def file_exists(self, s3_key: str) -> bool:
-        """
-        Check if a file exists in S3.
-
-        Args:
-            s3_key: The S3 key to check
-
-        Returns:
-            True if the file exists, False otherwise
-        """
-        try:
-            async with self.session.client(
-                "s3", endpoint_url=self.endpoint_url
-            ) as s3_client:
-                await s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
-                return True
-        except ClientError:
-            return False
-
-    def get_public_url(self, s3_key: str) -> str:
-        """
-        Get the public URL for a file in S3.
-        Note: This assumes the bucket is configured for public access.
-        For private buckets, use presigned URLs instead.
-
-        Args:
-            s3_key: The S3 key of the file
-
-        Returns:
-            The public URL of the file
-        """
-        if self.endpoint_url:
-            # For localstack or custom endpoints
-            return f"{self.endpoint_url}/{self.bucket_name}/{s3_key}"
-        else:
-            # Standard S3 URL
-            return f"https://{self.bucket_name}.s3.{settings.aws_region}.amazonaws.com/{s3_key}"
-
     async def generate_presigned_url(
         self, s3_key: str, expiration: int = 3600
     ) -> str:

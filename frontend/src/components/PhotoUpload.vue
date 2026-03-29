@@ -1,5 +1,5 @@
 <template>
-  <div class="w-[398px] shrink-0 flex flex-col">
+  <div class="  flex flex-col">
     <label
       class="h-[524px] w-full rounded-[14px] border-2 border-[#4954E7] bg-[rgba(73,84,231,0.05)] px-8 py-[81px] flex flex-col items-center justify-center cursor-pointer transition hover:bg-[rgba(73,84,231,0.09)] hover:shadow-[0_14px_30px_rgba(73,84,231,0.12)]"
       :class="{
@@ -25,7 +25,24 @@
         <div class="text-[12px] text-[#64748b]">Select some images (JPG, PNG, etc.)</div>
       </div>
     </label>
-    <div v-if="isLoading" class="mt-3 text-[13px] text-[#7c3aed] font-semibold">Loading...</div>
+    <div v-if="isDeleting" class="mt-3 flex flex-col gap-[6px]">
+      <div class="text-[12px] font-semibold text-[#ef4444]">Deleting…</div>
+      <div class="w-full h-[6px] rounded-full bg-[rgba(239,68,68,0.12)] overflow-hidden">
+        <div class="h-full rounded-full bg-[#ef4444] animate-pulse" style="width:100%" />
+      </div>
+    </div>
+    <div v-else-if="isLoading" class="mt-3 flex flex-col gap-[6px]">
+      <div class="flex justify-between text-[12px] font-semibold text-[#7c3aed]">
+        <span>Uploading…</span>
+        <span>{{ uploadProgress }}%</span>
+      </div>
+      <div class="w-full h-[6px] rounded-full bg-[rgba(73,84,231,0.12)] overflow-hidden">
+        <div
+          class="h-full rounded-full bg-[#4954E7] transition-all duration-200"
+          :style="{ width: `${uploadProgress}%` }"
+        />
+      </div>
+    </div>
     <div v-if="error" class="mt-3 text-[13px] text-[#ef4444] font-semibold bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] px-3 py-[10px] rounded-xl">{{ error }}</div>
   </div>
 </template>
@@ -35,7 +52,9 @@ import { ref } from 'vue'
 
 const props = defineProps<{
   isLoading: boolean
+  isDeleting: boolean
   error: string | null
+  uploadProgress: number
 }>()
 
 const emit = defineEmits<{

@@ -14,15 +14,14 @@ Environment variables (see app/config.py):
 """
 
 import asyncio
-import io
 import json
 import logging
 import math
-import os
 import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 
 from .config import settings
@@ -100,10 +99,11 @@ async def _update_job_tiles(
         await session.commit()
 
 
-def _tail(text: str, n: int = 40) -> str:
-    """Return the last *n* lines of *text*."""
-    lines = text.strip().splitlines()
-    return "\n".join(lines[-n:])
+def _parse_error_message(exc: Exception) -> str:
+    """Return a user-friendly error message without raw tracebacks."""
+    exc_str = str(exc)
+
+ 
 
 
 def _build_exposea_config_yaml(job: StitchJob) -> str:
@@ -210,6 +210,37 @@ def _generate_tiles_pil(src_path: Path, output_dir: Path) -> tuple[int, int, int
 _active_jobs: set[str] = set()  # job IDs currently being processed by this worker
 _job_semaphore = asyncio.Semaphore(1)  # allow only 1 concurrent job per worker process
 
+# Heartbeat interval must be well below LOCK_TTL_SECONDS (600s) so the lock
+# is refreshed multiple times before it could expire under normal operation.
+# 3 min interval → lock refreshed ~3× within the 10-min TTL window.
+HEARTBEAT_INTERVAL = 180  # seconds
+
+
+async def _heartbeat_loop(job_id: str, msg_id: str, stop_event: asyncio.Event) -> None:
+    """
+    Refresh the distributed lock TTL and PEL idle timer while a job is running.
+
+    Fires every HEARTBEAT_INTERVAL seconds until stop_event is set or the task
+    is cancelled. This keeps the lock alive for arbitrarily long jobs while still
+    allowing fast crash recovery (lock expires within LOCK_TTL_SECONDS after the
+    heartbeat stops).
+    """
+    try:
+        while True:
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=HEARTBEAT_INTERVAL)
+                break  # stop_event fired — exit cleanly
+            except asyncio.TimeoutError:
+                pass  # interval elapsed, do a refresh
+            try:
+                await redis_service.refresh_job_lock(job_id)
+                await redis_service.refresh_message_claim(msg_id)
+                logger.debug("[%s] Heartbeat refreshed lock + claim for job %s", msg_id, job_id)
+            except Exception as exc:
+                logger.warning("[%s] Heartbeat error for job %s: %s", msg_id, job_id, exc)
+    except asyncio.CancelledError:
+        pass
+
 
 async def process_job(job_id: str, msg_id: str, is_reclaim: bool = False) -> None:
     """
@@ -243,9 +274,8 @@ Full lifecycle of a single stitch job:
         await redis_service.ack(msg_id)
         return
 
-    _active_jobs.add(job_id)
-
-    # Check max retries for reclaimed messages
+    # Check max retries for reclaimed messages — before _active_jobs.add so
+    # the early return doesn't leave a stale ID in the set.
     current_attempt = job.attempt + 1
     if is_reclaim and current_attempt > settings.max_retries:
         logger.warning(
@@ -260,18 +290,40 @@ Full lifecycle of a single stitch job:
             attempt=current_attempt,
         )
         await redis_service.ack(msg_id)
-        return
+        return  # safe: _active_jobs never touched
 
-    # ── Mark RUNNING ──────────────────────────────────────────────
-    now = datetime.now(timezone.utc)
-    await _update_job(job_id, status="running", started_at=now, attempt=current_attempt)
+    # Acquire a distributed lock so only one worker processes this job at a time.
+    acquired = await redis_service.acquire_job_lock(job_id)
+    if not acquired:
+        logger.info(
+            "[%s] Job %s is already locked by another worker – skipping (no ack)",
+            msg_id, job_id,
+        )
+        return  # do NOT ack — owning worker will ack when done
 
-    work_root = Path(settings.work_dir) / job_id
+    # Start heartbeat BEFORE the try/finally so the finally block always
+    # stops it. The heartbeat refreshes the lock TTL and PEL idle timer every
+    # HEARTBEAT_INTERVAL seconds, keeping both alive for arbitrarily long jobs.
+    _heartbeat_stop = asyncio.Event()
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop(job_id, msg_id, _heartbeat_stop))
+    _active_jobs.add(job_id)
+
+    # Define work_root before the try so finally can always reference it.
+    # Unique per execution: prevents stale-file cross-contamination across
+    # retries and collision between workers sharing a filesystem.
+    work_root = Path(settings.work_dir) / f"{job_id}-{current_attempt}-{uuid4().hex}"
     task_dir = work_root / "task"
     images_dir = task_dir / "images"
     output_dir = work_root / "output"
+    stdout_str = ""
+    stderr_str = ""
 
     try:
+        # ── Mark RUNNING ──────────────────────────────────────────────
+        # Inside try so that a DB failure here still hits finally, which
+        # releases the lock, stops the heartbeat, and cleans _active_jobs.
+        now = datetime.now(timezone.utc)
+        await _update_job(job_id, status="running", started_at=now, attempt=current_attempt)
         # ── Validate Exposea path ─────────────────────────────────
         exposea_dir = Path(settings.exposea_path)
         register_py = exposea_dir / "register.py"
@@ -325,10 +377,7 @@ Full lifecycle of a single stitch job:
         stderr_str = stderr_b.decode(errors="replace")
 
         if proc.returncode != 0:
-            err_tail = _tail(stderr_str)
-            raise RuntimeError(
-                f"Exposea exited with code {proc.returncode}\n{err_tail}"
-            )
+            raise RuntimeError(f"Exposea exited with code {proc.returncode}")
 
         # ── Find and upload result ────────────────────────────────
         _RESULT_SUFFIXES = {".tiff", ".tif", ".j2k", ".jp2"}
@@ -397,23 +446,56 @@ Full lifecycle of a single stitch job:
             )
         except Exception as tile_exc:
             logger.warning("[%s] Tile generation failed (non-fatal): %s", msg_id, tile_exc)
-        await redis_service.ack(msg_id)
+        # Ack in its own try so a Redis hiccup here cannot trigger the outer
+        # except and overwrite the already-committed "finished" DB status.
+        try:
+            await redis_service.ack(msg_id)
+        except Exception as ack_exc:
+            logger.warning("[%s] Failed to ack after success (will be reclaimed): %s", msg_id, ack_exc)
         elapsed = time.monotonic() - t0
         logger.info("[%s] Job %s FINISHED in %.1fs", msg_id, job_id, elapsed)
 
     except Exception as exc:
         logger.exception("[%s] Job %s FAILED: %s", msg_id, job_id, exc)
-        await _update_job(
-            job_id,
-            status="failed",
-            finished_at=datetime.now(timezone.utc),
-            error_message=str(exc)[:2000],
-        )
-        await redis_service.ack(msg_id)
+        log_s3_key = None
+        if stdout_str or stderr_str:  # Exposea actually ran
+            try:
+                log_key = f"stitch-logs/{job_id}.txt"
+                await s3_service.upload_file(
+                    (stdout_str + "\n--- STDERR ---\n" + stderr_str).encode(),
+                    log_key,
+                    content_type="text/plain",
+                )
+                log_s3_key = log_key
+            except Exception:
+                pass
+        # Update DB status separately so a DB error here does not prevent ack.
+        try:
+            await _update_job(
+                job_id,
+                status="failed",
+                finished_at=datetime.now(timezone.utc),
+                error_message=_parse_error_message(exc),
+                log_s3_key=log_s3_key,
+            )
+        except Exception as db_exc:
+            logger.error("[%s] Failed to mark job %s as failed in DB: %s", msg_id, job_id, db_exc)
+        # Always ack even if the DB update above failed — without this the
+        # message stays in PEL and the job would be retried despite having failed.
+        try:
+            await redis_service.ack(msg_id)
+        except Exception as ack_exc:
+            logger.warning("[%s] Failed to ack after failure: %s", msg_id, ack_exc)
 
     finally:
+        _heartbeat_stop.set()
+        _heartbeat_task.cancel()
+        try:
+            await _heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        await redis_service.release_job_lock(job_id)
         _active_jobs.discard(job_id)
-        # Clean up working directory
         if work_root.exists():
             shutil.rmtree(work_root, ignore_errors=True)
 
@@ -470,6 +552,10 @@ async def main() -> None:
                 await asyncio.sleep(5)
     finally:
         reclaim_task.cancel()
+        try:
+            await reclaim_task
+        except asyncio.CancelledError:
+            pass
         await redis_service.close()
 
 

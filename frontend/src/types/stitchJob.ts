@@ -1,10 +1,4 @@
-export type PresetName =
-  | "debug"
-  | "default"
-  | "p_100mpx"
-  | "p_200mpx"
-  | "p_400mpx"
-  | "p_normal";
+export type PresetName = "p_100mpx" | "p_200mpx" | "p_400mpx";
 
 export type SaveFormat = "jp2" | "j2k" | "tiff" | "tif";
 
@@ -27,6 +21,7 @@ export type StitchJob = {
   finished_at: string | null;
   ref_photo_id: string | null;
   result_s3_key: string | null;
+  log_s3_key: string | null;
   error_message: string | null;
   tiles_ready: boolean;
   tiles_s3_prefix: string | null;
@@ -70,13 +65,10 @@ export type StitchJobListParams = {
   sort?: "startDateDesc" | "startDateAsc";
 };
 
-export const PRESET_OPTIONS: { value: PresetName; label: string }[] = [
-  { value: "debug", label: "Debug" },
-  { value: "default", label: "Default" },
-  { value: "p_100mpx", label: "100 MPX" },
-  { value: "p_200mpx", label: "200 MPX" },
-  { value: "p_400mpx", label: "400 MPX" },
-  { value: "p_normal", label: "Normal" },
+export const PRESET_OPTIONS: { value: PresetName; label: string; maxMpx: number }[] = [
+  { value: "p_100mpx", label: "100 MPx", maxMpx: 150 },
+  { value: "p_200mpx", label: "200 MPx", maxMpx: 300 },
+  { value: "p_400mpx", label: "400 MPx", maxMpx: Infinity },
 ];
 
 export const SAVE_FORMAT_OPTIONS: { value: SaveFormat; label: string }[] = [

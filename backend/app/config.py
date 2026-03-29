@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     consumer_group: str = "stitch-workers"
     consumer_name: str = Field(default_factory=_default_consumer_name)
     block_ms: int = 5000
-    claim_idle_ms: int = 600000  # 10 minutes
+    claim_idle_ms: int = 900000   # 15 minutes (heartbeat resets PEL idle timer every 3 min)
     max_retries: int = 3
     work_dir: str = "/tmp/stitch_worker"
 

@@ -3,15 +3,20 @@ import type { PhotoItem } from "../types/photo";
 
 export type { PhotoItem };
 
-export const uploadPhoto = async (projectId: string, file: File) => {
+export const uploadPhoto = async (
+  projectId: string,
+  file: File,
+  onUploadProgress?: (event: import('axios').AxiosProgressEvent) => void,
+) => {
   const form = new FormData();
-  form.append("file", file); 
+  form.append("file", file);
 
   const resp = await api.post(`/projects/${projectId}/photos`, form, {
     headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress,
   });
 
-  return resp.data.item as string; // id photo
+  return resp.data.item as string;
 };
 
 export const listPhotos = async (

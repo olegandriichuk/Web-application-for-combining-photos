@@ -1,8 +1,8 @@
 <template>
-  <div class="py-12 px-4 pb-16 text-[#0f172a]">
+  <div class="max-w-[90%] mx-auto py-12 px-4 pb-16 text-[#0f172a]">
 
     <!-- Project Header -->
-    <div class="max-w-[1392px] mx-auto mb-7">
+    <div class=" mx-auto mb-7">
       <div class="flex items-center justify-between mb-[14px]">
         <button
           @click="goBackToProjects"
@@ -35,14 +35,14 @@
     </div>
 
     <!-- Photo grid (left) + Upload panel (right) -->
-    <div class="max-w-[1392px] mx-auto bg-white/[0.92] border border-[rgba(15,23,42,0.06)] rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.1),0_1px_0_rgba(255,255,255,0.6)_inset] p-[22px] backdrop-blur-[8px]">
+    <div class=" mx-auto bg-white/[0.92] border border-[rgba(15,23,42,0.06)] rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.1),0_1px_0_rgba(255,255,255,0.6)_inset] p-[22px] backdrop-blur-[8px]">
       <div class="mb-3">
         <h2 class="m-0 text-[14px] font-bold text-[#0f172a]">Uploaded Images</h2>
         <p class="mt-[6px] mb-0 text-[12px] text-[#64748b]">
           <template v-if="photos.length > 0">
             {{ photos.length }} {{ photos.length === 1 ? 'image ready to stitch' : 'images ready to stitch' }}
           </template>
-          <template v-else>Select 4–6 images to start stitching</template>
+          <template v-else>Start by uploading the images you want to stitch together</template>
         </p>
       </div>
 
@@ -55,8 +55,10 @@
           @select-reference="onSelectReference"
         />
         <PhotoUpload
-          :is-loading="isLoading"
+          :is-loading="isLoading || isDeleting"
+          :is-deleting="isDeleting"
           :error="error"
+          :upload-progress="uploadProgress"
           @upload="uploadFiles"
         />
       </div>
@@ -69,6 +71,9 @@
       :photo-ids="photoIds"
       :latest-job="latestJob"
       :ref-photo-name="refPhotoName"
+      :ref-photo-url="refPhotoUrl"
+      :ref-photo-original-width="refPhotoOriginalWidth"
+      :ref-photo-original-height="refPhotoOriginalHeight"
       :project-name="project?.name ?? ''"
       :project-description="project?.description ?? ''"
       @job-created="onStitchJobCreated"
@@ -113,13 +118,24 @@ const project = ref<Project | null>(null)
 
 const photos = ref<PhotoItem[]>([])
 const isLoading = ref(false)
+const isDeleting = ref(false)
 const error = ref<string | null>(null)
+const uploadProgress = ref(0) // 0–100
 const latestJob = ref<StitchJob | null>(null)
 const refPhotoId = ref<string | null>(null)
 
 const photoIds = computed(() => photos.value.map(p => p.id))
 const refPhotoName = computed(() =>
   photos.value.find(p => p.id === refPhotoId.value)?.original_name ?? null
+)
+const refPhotoUrl = computed(() =>
+  refPhotoId.value ? getPhotoUrl(refPhotoId.value) : null
+)
+const refPhotoOriginalWidth = computed(() =>
+  photos.value.find(p => p.id === refPhotoId.value)?.original_width ?? null
+)
+const refPhotoOriginalHeight = computed(() =>
+  photos.value.find(p => p.id === refPhotoId.value)?.original_height ?? null
 )
 
 // Clear reference selection if the selected photo is deleted
@@ -150,9 +166,15 @@ const uploadFiles = async (files: File[]) => {
   if (!files.length) return
   isLoading.value = true
   error.value = null
+  uploadProgress.value = 0
   try {
-    for (const file of files.slice(0, 6)) {
-      await apiUploadPhoto(projectId.value, file)
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]!
+      await apiUploadPhoto(projectId.value, file, (event) => {
+        const fileProgress = (event.lengthComputable && event.total) ? event.loaded / event.total : 0
+        uploadProgress.value = Math.round((i + fileProgress) / files.length * 100)
+      })
+      uploadProgress.value = Math.round((i + 1) / files.length * 100)
     }
     await refresh()
   } catch (e: any) {
@@ -160,6 +182,7 @@ const uploadFiles = async (files: File[]) => {
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Upload failed'
   } finally {
     isLoading.value = false
+    uploadProgress.value = 0
   }
 }
 
@@ -173,7 +196,7 @@ const confirmDeletePhoto = async () => {
   const id = pendingDeletePhotoId.value
   pendingDeletePhotoId.value = null
   if (!id) return
-  isLoading.value = true
+  isDeleting.value = true
   error.value = null
   try {
     await apiDeletePhoto(projectId.value, id)
@@ -183,7 +206,7 @@ const confirmDeletePhoto = async () => {
     console.error(e)
     error.value = e?.response?.data?.detail ?? e?.message ?? 'Failed to delete'
   } finally {
-    isLoading.value = false
+    isDeleting.value = false
   }
 }
 

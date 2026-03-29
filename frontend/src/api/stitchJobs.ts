@@ -41,6 +41,14 @@ export const getJobResult = async (
   return resp.data;
 };
 
+export const getJobLog = async (
+  projectId: string,
+  jobId: string
+): Promise<{ log_url: string }> => {
+  const resp = await api.get(`/projects/${projectId}/stitch-jobs/${jobId}/log`)
+  return resp.data
+}
+
 export const getJobTileMetadata = async (
   projectId: string,
   jobId: string

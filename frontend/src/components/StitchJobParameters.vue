@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-[1392px] mx-auto mt-[18px] bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-5">
+  <div class=" mx-auto mt-[18px] bg-white rounded-[14px] shadow-[0_4px_16px_rgba(0,0,0,0.08)] p-5">
 
     
 
@@ -22,6 +22,9 @@
       :project-id="projectId"
       :photo-ids="photoIds"
       :ref-photo-name="refPhotoName"
+      :ref-photo-url="refPhotoUrl"
+      :ref-photo-original-width="refPhotoOriginalWidth"
+      :ref-photo-original-height="refPhotoOriginalHeight"
       @created="onJobCreated"
     />
 
@@ -38,6 +41,9 @@ const props = defineProps<{
   photoIds: string[]
   latestJob: StitchJob | null
   refPhotoName: string | null
+  refPhotoUrl: string | null
+  refPhotoOriginalWidth: number | null
+  refPhotoOriginalHeight: number | null
   projectName: string
   projectDescription: string
 }>()

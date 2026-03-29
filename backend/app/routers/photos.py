@@ -75,7 +75,16 @@ async def upload_photo(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to S3: {str(e)}")
 
-    # 5) Generate preview and upload to S3
+    # 5) Read original image dimensions
+    original_width: int | None = None
+    original_height: int | None = None
+    try:
+        with Image.open(io.BytesIO(file_content)) as img:
+            original_width, original_height = img.size
+    except Exception:
+        pass
+
+    # 6) Generate preview and upload to S3
     preview_s3_key: str | None = None
     try:
         preview_bytes = await asyncio.to_thread(_generate_preview_bytes, file_content)
@@ -90,7 +99,7 @@ async def upload_photo(
         # Non-fatal: original uploaded; preview can be generated on demand via fallback
         pass
 
-    # 6) Save metadata to database
+    # 7) Save metadata to database
     await photo_repo.create_photo_meta(
         session,
         id=fid,
@@ -101,6 +110,8 @@ async def upload_photo(
         user_id=current_user.id,
         project_id=project_id,
         preview_s3_key=preview_s3_key,
+        original_width=original_width,
+        original_height=original_height,
     )
 
     await session.commit()
