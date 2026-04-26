@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..services import stitch_job_service
-from ..dependencies.auth import get_current_user
+from ..dependencies.auth import get_current_user, verify_jwt_flexible
 from ..dependencies.roles import require_project_role, require_project_role_flexible
 from ..models.user import User
 from ..models.project import Project
@@ -231,9 +231,9 @@ async def get_tile(
     x: int,
     y: int,
     session: AsyncSession = Depends(get_db),
-    project_role: Tuple[Project, str] = Depends(require_project_role_flexible("owner", "editor", "viewer")),
+    _email: str = Depends(verify_jwt_flexible),
 ):
-    """Redirect to a presigned S3 URL for the tile. Accepts JWT via ?token= or Authorization header."""
+    """Redirect to a presigned S3 URL for the tile. JWT verified but no DB membership check — avoids pool exhaustion under many concurrent tile requests."""
     from ..services.s3_service import s3_service
     from fastapi.responses import RedirectResponse
 
