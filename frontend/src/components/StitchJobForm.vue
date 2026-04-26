@@ -140,8 +140,22 @@
       </div>
 
       <div class="flex flex-col gap-[6px]">
-        <label for="save_format" class="text-[13px] font-semibold text-[#0f172a]">
+        <label for="save_format" class="text-[13px] font-semibold text-[#0f172a] flex items-center gap-1">
           Output Format <span class="text-[#ef4444] ml-[2px]">*</span>
+          <span class="relative group ml-0.5 inline-flex items-center cursor-default">
+            <svg class="text-[#94a3b8] hover:text-[#64748b] transition-colors" width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="8" cy="5.25" r="0.85" fill="currentColor"/>
+            </svg>
+            <div class="absolute top-full left-0 mt-2 w-[300px] px-3 py-2.5 rounded-[8px] bg-[#1e293b] text-white text-[12px] leading-[1.6] font-normal opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg whitespace-normal">
+              <div class="absolute bottom-full left-[10px] border-[5px] border-transparent border-b-[#1e293b]"></div>
+              <p class="m-0 mb-1.5 font-semibold text-[#e2e8f0]">Output formats</p>
+              <p class="m-0 mb-1"><span class="font-semibold text-[#93c5fd]">.JP2</span> — JPEG 2000 file. Excellent compression with no visible quality loss; best for large orthomosaics and GIS workflows.</p>
+              <p class="m-0 mb-1"><span class="font-semibold text-[#93c5fd]">.J2K</span> — Raw JPEG 2000 codestream. Same compression as JP2 but without the file-format wrapper; used when downstream tools expect a bare stream.</p>
+              <p class="m-0 mb-1"><span class="font-semibold text-[#93c5fd]">.TIFF / .TIF</span> — Tagged Image File Format. Lossless, universally supported by GIS and imaging software; larger file size than JP2.</p>
+            </div>
+          </span>
         </label>
         <div class="relative">
           <select

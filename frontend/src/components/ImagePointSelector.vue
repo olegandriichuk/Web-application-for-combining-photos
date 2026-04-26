@@ -1,19 +1,58 @@
 <template>
   <div class="flex flex-col gap-[6px] w-full">
-    <label class="text-[13px] font-semibold text-[#0f172a] flex items-center gap-1">
-      Corner Point Selector
-      <span class="relative group ml-0.5 inline-flex items-center cursor-default">
-        <svg class="text-[#94a3b8] hover:text-[#64748b] transition-colors" width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M8 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <circle cx="8" cy="5.25" r="0.85" fill="currentColor"/>
-        </svg>
-        <div class="absolute top-full left-0 mt-2 w-[272px] px-3 py-2.5 rounded-[8px] bg-[#1e293b] text-white text-[12px] leading-[1.6] font-normal opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg whitespace-normal">
-          <div class="absolute bottom-full left-[10px] border-[5px] border-transparent border-b-[#1e293b]"></div>
-          Click on the image to place each of the 4 corner points. Drag any placed point to reposition it. Coordinates are automatically filled into the fields below.
-        </div>
-      </span>
-    </label>
+    <div class="flex items-center justify-between">
+      <label class="text-[13px] font-semibold text-[#0f172a] flex items-center gap-1">
+        Corner Point Selector
+        <span class="relative group ml-0.5 inline-flex items-center cursor-default">
+          <svg class="text-[#94a3b8] hover:text-[#64748b] transition-colors" width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 7.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="5.25" r="0.85" fill="currentColor"/>
+          </svg>
+          <div class="absolute top-full left-0 mt-2 w-[272px] px-3 py-2.5 rounded-[8px] bg-[#1e293b] text-white text-[12px] leading-[1.6] font-normal opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 z-50 shadow-lg whitespace-normal">
+            <div class="absolute bottom-full left-[10px] border-[5px] border-transparent border-b-[#1e293b]"></div>
+            Click on the image to place each of the 4 corner points. Drag any placed point to reposition it. Use scroll wheel or +/– buttons to zoom. Coordinates are automatically filled into the fields below.
+          </div>
+        </span>
+      </label>
+
+      <!-- Zoom controls (outside canvas, top-right) -->
+      <div v-if="props.refImageSrc" class="flex items-center gap-1">
+        <button
+          type="button"
+          :disabled="zoom <= MIN_ZOOM"
+          class="w-7 h-7 flex items-center justify-center rounded-[6px] bg-white border border-[rgba(15,23,42,0.12)] shadow-sm text-[#64748b] hover:text-[#0f172a] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Zoom out"
+          @click.prevent="zoomOut"
+        >
+          <ZoomOut :size="13" aria-hidden="true" />
+        </button>
+
+        <span class="min-w-[38px] text-center text-[11px] font-semibold text-[#0f172a] select-none tabular-nums">
+          {{ zoomLabel }}
+        </span>
+
+        <button
+          type="button"
+          :disabled="zoom >= MAX_ZOOM"
+          class="w-7 h-7 flex items-center justify-center rounded-[6px] bg-white border border-[rgba(15,23,42,0.12)] shadow-sm text-[#64748b] hover:text-[#0f172a] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Zoom in"
+          @click.prevent="zoomIn"
+        >
+          <ZoomIn :size="13" aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          :disabled="zoom <= 1"
+          class="w-7 h-7 flex items-center justify-center rounded-[6px] bg-white border border-[rgba(15,23,42,0.12)] shadow-sm text-[#64748b] hover:text-[#0f172a] transition-all disabled:opacity-40 disabled:cursor-not-allowed ml-0.5"
+          title="Reset zoom"
+          @click.prevent="resetZoom"
+        >
+          <RotateCcw :size="13" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
 
     <div
       class="relative w-full overflow-hidden rounded-[10px] border border-[rgba(15,23,42,0.12)] bg-[rgba(248,250,252,0.9)]"
@@ -41,6 +80,7 @@
         @mouseleave="onMouseLeave"
         @click="onCanvasClick"
       />
+
     </div>
 
     <p class="m-0 text-[11px] text-[#94a3b8]">{{ statusText }}</p>
@@ -49,6 +89,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-vue-next'
 
 const props = defineProps<{
   refImageSrc: string | null
@@ -66,6 +107,10 @@ const emit = defineEmits<{
 const POINT_COLORS = ['#ef4444', '#f97316', '#22c55e', '#3b82f6']
 const POINT_RADIUS = 6
 const DRAG_HIT_RADIUS = 8
+const MIN_ZOOM = 1
+const MAX_ZOOM = 8
+const ZOOM_STEP = 0.25
+const ZOOM_FACTOR = 1.15
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -73,17 +118,24 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const points = ref<([number, number] | null)[]>([null, null, null, null])
 const dragIndex = ref(-1)
 const hoverIndex = ref(-1)
+const zoom = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+const isPanningRef = ref(false)  // reactive twin of isPanning for cursorStyle
 
-// Non-reactive — avoids Vue wrapping a DOM element
+// Non-reactive — avoids Vue wrapping a DOM element or hot-path flags
 let loadedImage: HTMLImageElement | null = null
 let currentSrc = ''
 let resizeObserver: ResizeObserver | null = null
 let didDragThisClick = false
+let isPanning = false
+let panStartX = 0
+let panStartY = 0
+let panStartPanX = 0
+let panStartPanY = 0
 
 // ─── Coordinate helpers ───────────────────────────────────────────────────────
 
-// Use stored original dimensions when available; fall back to the loaded
-// preview's natural size (for photos uploaded before dimensions were tracked).
 function origWidth(): number {
   return props.originalWidth ?? loadedImage?.naturalWidth ?? 1
 }
@@ -91,14 +143,16 @@ function origHeight(): number {
   return props.originalHeight ?? loadedImage?.naturalHeight ?? 1
 }
 
-function toImageCoords(dispX: number, dispY: number): [number, number] {
+// Virtual coords → image coords
+function toImageCoords(vx: number, vy: number): [number, number] {
   const canvas = canvasRef.value!
   return [
-    Math.round(dispX * origWidth() / canvas.width),
-    Math.round(dispY * origHeight() / canvas.height),
+    Math.round(vx * origWidth() / canvas.width),
+    Math.round(vy * origHeight() / canvas.height),
   ]
 }
 
+// Image coords → virtual coords
 function toDisplayCoords(imgX: number, imgY: number): [number, number] {
   const canvas = canvasRef.value!
   return [
@@ -106,6 +160,68 @@ function toDisplayCoords(imgX: number, imgY: number): [number, number] {
     imgY * canvas.height / origHeight(),
   ]
 }
+
+// Raw screen-pixel coords relative to the canvas element
+function rawCanvasXY(e: MouseEvent): [number, number] {
+  const canvas = canvasRef.value!
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  return [
+    (e.clientX - rect.left) * scaleX,
+    (e.clientY - rect.top) * scaleY,
+  ]
+}
+
+// Virtual coords = screen coords de-transformed by current zoom/pan
+function getCanvasXY(e: MouseEvent): [number, number] {
+  const [sx, sy] = rawCanvasXY(e)
+  return [
+    (sx - panX.value) / zoom.value,
+    (sy - panY.value) / zoom.value,
+  ]
+}
+
+// ─── Pan clamping ─────────────────────────────────────────────────────────────
+
+function clampPan(canvas: HTMLCanvasElement) {
+  panX.value = Math.max(canvas.width * (1 - zoom.value), Math.min(0, panX.value))
+  panY.value = Math.max(canvas.height * (1 - zoom.value), Math.min(0, panY.value))
+}
+
+// ─── Zoom helpers ─────────────────────────────────────────────────────────────
+
+function applyZoom(newZoom: number, focalSX: number, focalSY: number) {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom))
+  panX.value = focalSX - (focalSX - panX.value) / zoom.value * newZoom
+  panY.value = focalSY - (focalSY - panY.value) / zoom.value * newZoom
+  zoom.value = newZoom
+  clampPan(canvas)
+  redraw()
+}
+
+function zoomIn() {
+  const c = canvasRef.value
+  if (!c) return
+  applyZoom(zoom.value + ZOOM_STEP, c.width / 2, c.height / 2)
+}
+
+function zoomOut() {
+  const c = canvasRef.value
+  if (!c) return
+  applyZoom(zoom.value - ZOOM_STEP, c.width / 2, c.height / 2)
+}
+
+function resetZoom() {
+  zoom.value = 1
+  panX.value = 0
+  panY.value = 0
+  redraw()
+}
+
+const zoomLabel = computed(() => `${zoom.value.toFixed(1)}×`)
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
@@ -116,11 +232,20 @@ function redraw() {
   if (!ctx) return
 
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height)
 
+  // Draw image with zoom/pan transform
+  ctx.save()
+  ctx.translate(panX.value, panY.value)
+  ctx.scale(zoom.value, zoom.value)
+  ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height)
+  ctx.restore()
+
+  // Draw markers in screen space (constant visual size regardless of zoom)
   points.value.forEach((pt, i) => {
     if (pt === null) return
-    const [dx, dy] = toDisplayCoords(pt[0], pt[1])
+    const [vx, vy] = toDisplayCoords(pt[0], pt[1])
+    const dx = vx * zoom.value + panX.value
+    const dy = vy * zoom.value + panY.value
     const color = POINT_COLORS[i] ?? '#3b82f6'
     const isHovered = hoverIndex.value === i
     const isDragged = dragIndex.value === i
@@ -162,6 +287,7 @@ function syncCanvasSize() {
   const cssWidth = canvas.clientWidth || (canvas.parentElement?.clientWidth ?? 600)
   canvas.width = cssWidth
   canvas.height = Math.round(cssWidth * loadedImage.naturalHeight / loadedImage.naturalWidth)
+  clampPan(canvas)
   redraw()
 }
 
@@ -191,6 +317,9 @@ watch(
     loadedImage = null
     dragIndex.value = -1
     hoverIndex.value = -1
+    zoom.value = 1
+    panX.value = 0
+    panY.value = 0
 
     if (newSrc && newSrc.length > 0) {
       loadImage(newSrc)
@@ -204,9 +333,6 @@ watch(
 )
 
 // ─── Sync from external inputs ───────────────────────────────────────────────
-// When the user edits a coordinate input manually, form.corner_points changes.
-// We compare incoming values against internal points and only update the canvas
-// when something actually differs — this prevents circular updates from drag/click.
 
 watch(
   () => props.currentPoints,
@@ -242,9 +368,12 @@ onMounted(() => {
     if (loadedImage) syncCanvasSize()
   })
   resizeObserver.observe(canvas)
+  // passive: false required — Chrome ignores e.preventDefault() in passive wheel listeners
+  canvas.addEventListener('wheel', onWheel, { passive: false })
 })
 
 onBeforeUnmount(() => {
+  canvasRef.value?.removeEventListener('wheel', onWheel)
   resizeObserver?.disconnect()
   resizeObserver = null
   currentSrc = ''
@@ -252,13 +381,16 @@ onBeforeUnmount(() => {
 
 // ─── Hit detection ────────────────────────────────────────────────────────────
 
-function findPointNear(dispX: number, dispY: number): number {
+// Takes screen-pixel coords so the hit radius stays constant regardless of zoom
+function findPointNear(screenX: number, screenY: number): number {
   let closest = -1
   let minDist = DRAG_HIT_RADIUS
   points.value.forEach((pt, i) => {
     if (pt === null) return
-    const [dx, dy] = toDisplayCoords(pt[0], pt[1])
-    const dist = Math.hypot(dispX - dx, dispY - dy)
+    const [vx, vy] = toDisplayCoords(pt[0], pt[1])
+    const sx = vx * zoom.value + panX.value
+    const sy = vy * zoom.value + panY.value
+    const dist = Math.hypot(screenX - sx, screenY - sy)
     if (dist < minDist) {
       minDist = dist
       closest = i
@@ -267,44 +399,54 @@ function findPointNear(dispX: number, dispY: number): number {
   return closest
 }
 
-// ─── Mouse coordinate helper ──────────────────────────────────────────────────
+// ─── Wheel zoom ───────────────────────────────────────────────────────────────
 
-function getCanvasXY(e: MouseEvent): [number, number] {
-  const canvas = canvasRef.value!
-  const rect = canvas.getBoundingClientRect()
-  const scaleX = canvas.width / rect.width
-  const scaleY = canvas.height / rect.height
-  return [
-    (e.clientX - rect.left) * scaleX,
-    (e.clientY - rect.top) * scaleY,
-  ]
+function onWheel(e: WheelEvent) {
+  if (!loadedImage || !props.refImageSrc) return
+  e.preventDefault()
+  const [sx, sy] = rawCanvasXY(e)
+  applyZoom(zoom.value * (e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR), sx, sy)
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
 
 function onMouseDown(e: MouseEvent) {
   if (!loadedImage || !props.refImageSrc) return
-  const [dispX, dispY] = getCanvasXY(e)
-  const hit = findPointNear(dispX, dispY)
+  const [sx, sy] = rawCanvasXY(e)
+  const hit = findPointNear(sx, sy)
   didDragThisClick = hit !== -1
   if (hit !== -1) {
     dragIndex.value = hit
+  } else if (zoom.value > 1) {
+    isPanning = true
+    isPanningRef.value = true
+    panStartX = sx
+    panStartY = sy
+    panStartPanX = panX.value
+    panStartPanY = panY.value
   }
 }
 
 function onMouseMove(e: MouseEvent) {
   if (!loadedImage || !props.refImageSrc) return
-  const [dispX, dispY] = getCanvasXY(e)
 
   if (dragIndex.value !== -1) {
+    const [vx, vy] = getCanvasXY(e)
     const canvas = canvasRef.value!
-    const clampedX = Math.max(0, Math.min(dispX, canvas.width))
-    const clampedY = Math.max(0, Math.min(dispY, canvas.height))
+    const clampedX = Math.max(0, Math.min(vx, canvas.width))
+    const clampedY = Math.max(0, Math.min(vy, canvas.height))
     points.value[dragIndex.value] = toImageCoords(clampedX, clampedY)
     redraw()
     tryEmit()
+  } else if (isPanning) {
+    const [sx, sy] = rawCanvasXY(e)
+    panX.value = panStartPanX + (sx - panStartX)
+    panY.value = panStartPanY + (sy - panStartY)
+    clampPan(canvasRef.value!)
+    redraw()
   } else {
-    const newHover = findPointNear(dispX, dispY)
+    const [sx, sy] = rawCanvasXY(e)
+    const newHover = findPointNear(sx, sy)
     if (newHover !== hoverIndex.value) {
       hoverIndex.value = newHover
       redraw()
@@ -314,10 +456,14 @@ function onMouseMove(e: MouseEvent) {
 
 function onMouseUp() {
   dragIndex.value = -1
+  isPanning = false
+  isPanningRef.value = false
 }
 
 function onMouseLeave() {
   dragIndex.value = -1
+  isPanning = false
+  isPanningRef.value = false
   if (hoverIndex.value !== -1) {
     hoverIndex.value = -1
     redraw()
@@ -328,13 +474,14 @@ function onCanvasClick(e: MouseEvent) {
   if (!loadedImage || !props.refImageSrc) return
   if (didDragThisClick) return
 
-  const [dispX, dispY] = getCanvasXY(e)
-  if (findPointNear(dispX, dispY) !== -1) return  // near an existing point → ignore
+  const [sx, sy] = rawCanvasXY(e)
+  if (findPointNear(sx, sy) !== -1) return  // near an existing point → ignore
 
   const emptyIdx = points.value.findIndex(p => p === null)
   if (emptyIdx === -1) return  // all 4 placed; user must drag to adjust
 
-  points.value[emptyIdx] = toImageCoords(dispX, dispY)
+  const [vx, vy] = getCanvasXY(e)
+  points.value[emptyIdx] = toImageCoords(vx, vy)
   redraw()
   tryEmit()
 }
@@ -352,7 +499,9 @@ function tryEmit() {
 const cursorStyle = computed(() => {
   if (!props.refImageSrc) return 'default'
   if (dragIndex.value !== -1) return 'grabbing'
+  if (isPanningRef.value) return 'grabbing'
   if (hoverIndex.value !== -1) return 'grab'
+  if (zoom.value > 1) return 'grab'
   return 'crosshair'
 })
 

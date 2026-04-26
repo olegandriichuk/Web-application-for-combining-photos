@@ -75,7 +75,7 @@ export const SAVE_FORMAT_OPTIONS: { value: SaveFormat; label: string }[] = [
   { value: "jp2", label: ".JP2" },
   { value: "j2k", label: ".J2K" },
   { value: "tiff", label: ".TIFF " },
-  { value: "tif", label: ".TIFF" },
+  { value: "tif", label: ".TIF" },
 ];
 
 export const STATUS_LABELS: Record<JobStatus, string> = {

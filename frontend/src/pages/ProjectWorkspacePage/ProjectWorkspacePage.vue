@@ -32,6 +32,10 @@
           </button>
         </div>
       </div>
+      <h1 class="m-0 mb-1 text-xl font-bold text-[#0f172a]">
+        {{ project?.name || 'Loading...' }}
+      </h1>
+      <p v-if="project?.description" class="m-0 text-[13px] text-[#64748b]">{{ project.description }}</p>
     </div>
 
     <!-- Photo grid (left) + Upload panel (right) -->
@@ -65,7 +69,7 @@
     </div>
 
     <!-- Stitch section -->
-    <StitchJobParameters
+    <StitchJobPanel
       v-if="photos.length > 0"
       :project-id="projectId"
       :photo-ids="photoIds"
@@ -107,7 +111,7 @@ import { type StitchJob } from '../../types/stitchJob'
 import { showToast } from '@/lib/toast'
 import UploadedPhotosList from '../../components/UploadedPhotosList.vue'
 import PhotoUpload from '../../components/PhotoUpload.vue'
-import StitchJobParameters from '../../components/StitchJobParameters.vue'
+import StitchJobPanel from '../../components/StitchJobPanel.vue'
 import ConfirmModal from '../../components/ConfirmModal.vue'
 
 const route = useRoute()
