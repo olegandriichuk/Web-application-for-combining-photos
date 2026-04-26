@@ -230,22 +230,16 @@ async def get_tile(
     z: int,
     x: int,
     y: int,
-    session: AsyncSession = Depends(get_db),
     _email: str = Depends(verify_jwt_flexible),
 ):
-    """Redirect to a presigned S3 URL for the tile. JWT verified but no DB membership check — avoids pool exhaustion under many concurrent tile requests."""
+    """Redirect to a presigned S3 URL for the tile.
+    No DB query — tile key is deterministic from project_id + job_id in the URL.
+    JWT verified via signature only (no DB lookup). Zero DB involvement per tile.
+    """
     from ..services.s3_service import s3_service
     from fastapi.responses import RedirectResponse
 
-    job = await stitch_job_service.get_job(
-        session,
-        job_id=job_id,
-        project_id=project_id,
-    )
-    if not job or not job.tiles_s3_prefix:
-        raise HTTPException(status_code=404, detail="Tiles not available")
-
-    tile_key = f"{job.tiles_s3_prefix}/{z}/{x}/{y}.jpg"
+    tile_key = f"stitch-tiles/{project_id}/{job_id}/{z}/{x}/{y}.jpg"
     try:
         presigned_url = await s3_service.generate_presigned_url(tile_key, expiration=300)
         return RedirectResponse(url=presigned_url, status_code=307)

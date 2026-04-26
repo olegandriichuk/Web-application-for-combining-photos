@@ -1,5 +1,6 @@
 """Service for interacting with AWS S3 storage."""
 import logging
+import boto3
 import aioboto3
 from botocore.exceptions import ClientError
 from ..config import settings
@@ -18,6 +19,15 @@ class S3Service:
         )
         self.bucket_name = settings.s3_bucket_name
         self.endpoint_url = settings.aws_endpoint_url
+
+        # Sync boto3 client reused for presigned URL generation (pure CPU, no network)
+        self._sync_s3 = boto3.client(
+            "s3",
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_region,
+            endpoint_url=settings.aws_endpoint_url,
+        )
 
     async def upload_file(
         self,
@@ -173,26 +183,14 @@ class S3Service:
     async def generate_presigned_url(
         self, s3_key: str, expiration: int = 3600
     ) -> str:
-        """
-        Generate a presigned URL for temporary access to a private file.
-        Args:
-            s3_key: The S3 key of the file
-            expiration: Time in seconds for the URL to remain valid (default: 1 hour)
-        Returns:
-            A presigned URL
-        Raises:
-            Exception: If URL generation fails
-        """
+        """Generate a presigned URL using the cached sync client (pure CPU, no network)."""
         try:
-            async with self.session.client(
-                "s3", endpoint_url=self.endpoint_url
-            ) as s3_client:
-                url = await s3_client.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": self.bucket_name, "Key": s3_key},
-                    ExpiresIn=expiration,
-                )
-                return url
+            url = self._sync_s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": s3_key},
+                ExpiresIn=expiration,
+            )
+            return url
         except ClientError as e:
             logger.error(f"Failed to generate presigned URL: {e}")
             raise Exception(f"Presigned URL generation failed: {str(e)}")

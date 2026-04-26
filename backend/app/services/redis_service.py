@@ -29,6 +29,7 @@ class RedisService:
             self._client = aioredis.from_url(
                 settings.redis_url,
                 decode_responses=True,
+                ssl_cert_reqs=None,
             )
         return self._client
 
@@ -51,7 +52,7 @@ class RedisService:
             await client.xgroup_create(
                 settings.stream_key,
                 settings.consumer_group,
-                id="$",
+                id="0",
                 mkstream=True,
             )
             logger.info(
