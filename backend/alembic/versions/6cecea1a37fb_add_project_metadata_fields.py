@@ -24,7 +24,9 @@ def upgrade() -> None:
     op.add_column('projects', sa.Column('document_type', sa.String(length=50), nullable=True))
     op.add_column('projects', sa.Column('institution', sa.String(length=200), nullable=True))
     op.add_column('projects', sa.Column('collection', sa.String(length=200), nullable=True))
-    op.add_column('projects', sa.Column('is_private', sa.Boolean(), server_default='0', nullable=False))
+    # SQLite: server_default='0' — replaced with sa.false() for unambiguous PostgreSQL boolean default
+    # op.add_column('projects', sa.Column('is_private', sa.Boolean(), server_default='0', nullable=False))
+    op.add_column('projects', sa.Column('is_private', sa.Boolean(), server_default=sa.false(), nullable=False))
 
 
 def downgrade() -> None:

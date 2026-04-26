@@ -19,7 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("UPDATE projects SET is_private = 1 WHERE is_private = 0")
+    # SQLite: integer literals 1/0 were used; PostgreSQL boolean requires true/false
+    # op.execute("UPDATE projects SET is_private = 1 WHERE is_private = 0")
+    op.execute("UPDATE projects SET is_private = true WHERE is_private = false")
 
 
 def downgrade() -> None:
