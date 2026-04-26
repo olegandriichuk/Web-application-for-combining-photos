@@ -81,7 +81,7 @@ onMounted(async () => {
 
   const token = authStore.getToken()
   const tileUrlTemplate =
-    `http://localhost:8000/projects/${props.projectId}/stitch-jobs/${props.jobId}/tiles/{z}/{x}/{y}` +
+    `/api/projects/${props.projectId}/stitch-jobs/${props.jobId}/tiles/{z}/{x}/{y}` +
     (token ? `?token=${encodeURIComponent(token)}` : '')
 
   const { width, height, min_zoom, max_zoom } = props.metadata
