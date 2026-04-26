@@ -233,8 +233,9 @@ async def get_tile(
     session: AsyncSession = Depends(get_db),
     project_role: Tuple[Project, str] = Depends(require_project_role_flexible("owner", "editor", "viewer")),
 ):
-    """Proxy a tile image from S3. Accepts JWT via ?token= or Authorization header."""
+    """Redirect to a presigned S3 URL for the tile. Accepts JWT via ?token= or Authorization header."""
     from ..services.s3_service import s3_service
+    from fastapi.responses import RedirectResponse
 
     job = await stitch_job_service.get_job(
         session,
@@ -246,7 +247,7 @@ async def get_tile(
 
     tile_key = f"{job.tiles_s3_prefix}/{z}/{x}/{y}.jpg"
     try:
-        tile_bytes = await s3_service.download_file(tile_key)
-        return Response(content=tile_bytes, media_type="image/jpeg")
+        presigned_url = await s3_service.generate_presigned_url(tile_key, expiration=300)
+        return RedirectResponse(url=presigned_url, status_code=307)
     except Exception:
         raise HTTPException(status_code=404, detail="Tile not found")
