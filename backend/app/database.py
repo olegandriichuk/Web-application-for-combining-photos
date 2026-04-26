@@ -12,6 +12,7 @@ engine = create_async_engine(
     DATABASE_URL,
     future=True,
     echo=False,
+    pool_pre_ping=True,  # reconnect if Neon closes idle connections
     # SQLite: poolclass=NullPool — ensures a fresh connection per request for SQLite
     # poolclass=NullPool,
 )
