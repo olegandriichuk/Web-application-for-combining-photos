@@ -151,7 +151,7 @@ async def get_stitch_job_result(
 
 @router.get(
     "/projects/{project_id}/stitch-jobs/{job_id}/log",
-    summary="Get presigned download URL for a job's log file",
+    summary="Stream log file content for a job",
 )
 async def get_stitch_job_log(
     project_id: str,
@@ -159,7 +159,7 @@ async def get_stitch_job_log(
     session: AsyncSession = Depends(get_db),
     project_role: Tuple[Project, str] = Depends(require_project_role("owner", "editor", "viewer")),
 ):
-    """Returns a short-lived S3 presigned URL for the job's log file."""
+    """Streams the log file content from S3 directly — no CORS issues."""
     from ..services.s3_service import s3_service
 
     job = await stitch_job_service.get_job(session, job_id=job_id, project_id=project_id)
@@ -167,8 +167,12 @@ async def get_stitch_job_log(
         raise HTTPException(status_code=404, detail="Stitch job not found")
     if not job.log_s3_key:
         raise HTTPException(status_code=404, detail="No log available for this job")
-    log_url = await s3_service.generate_presigned_url(job.log_s3_key, expiration=3600)
-    return {"log_url": log_url}
+    log_content = await s3_service.download_file(job.log_s3_key)
+    return Response(
+        content=log_content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{job_id}.txt"'},
+    )
 
 
 @router.get(

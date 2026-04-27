@@ -44,8 +44,10 @@ export const getJobResult = async (
 export const getJobLog = async (
   projectId: string,
   jobId: string
-): Promise<{ log_url: string }> => {
-  const resp = await api.get(`/projects/${projectId}/stitch-jobs/${jobId}/log`)
+): Promise<Blob> => {
+  const resp = await api.get(`/projects/${projectId}/stitch-jobs/${jobId}/log`, {
+    responseType: 'blob',
+  })
   return resp.data
 }
 

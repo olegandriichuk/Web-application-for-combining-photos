@@ -392,8 +392,7 @@ const openLogDownload = async (job: StitchJob) => {
   if (loadingLog.value[job.id]) return
   loadingLog.value[job.id] = true
   try {
-    const { log_url } = await getJobLog(props.projectId, job.id)
-    const blob = await fetch(log_url).then(r => r.blob())
+    const blob = await getJobLog(props.projectId, job.id)
     const blobUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = blobUrl
