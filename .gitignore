@@ -4,6 +4,7 @@ CLAUDE.md
 # Environment variables with secrets
 .env
 backend/.env
+deploy/.env
 aws.txt
 **/aws*.txt
 

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # Exposea
-    exposea_path: str = "/home/makaroni/Exposea"
+    exposea_path: str = "/app/exposea"
 
     # Redis Streams / Worker Configuration
     stream_key: str = "stitch:jobs"

@@ -1,8 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-# SQLite: these imports were needed for Base.metadata.create_all on startup
-# from .database import engine, Base
+from fastapi.staticfiles import StaticFiles
 
 from .routers import photos, auth, projects, stitch_jobs, project_members
 from .models import photo as _photo
@@ -27,19 +27,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# SQLite: auto-created all tables on startup; replaced by `alembic upgrade head` in entrypoint.sh
-# @app.on_event("startup")
-# async def on_startup():
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.create_all)
 
-
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(projects.router, prefix="/projects", tags=["projects"])
-app.include_router(project_members.router, prefix="/projects", tags=["project-members"])
-app.include_router(photos.router, tags=["photos"])
-app.include_router(stitch_jobs.router, tags=["stitch-jobs"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
+app.include_router(project_members.router, prefix="/api/projects", tags=["project-members"])
+app.include_router(photos.router, prefix="/api", tags=["photos"])
+app.include_router(stitch_jobs.router, prefix="/api", tags=["stitch-jobs"])
 
 @app.get("/health")
 async def health():
     return {"ok": True}
+
+# Serve Vue SPA from /app/static when running in Docker (not present in dev)
+_static = Path("/app/static")
+if _static.is_dir():
+    app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")

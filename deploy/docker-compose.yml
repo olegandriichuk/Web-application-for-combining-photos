@@ -1,0 +1,35 @@
+services:
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+      args:
+        - REPO=${REPO}
+        - BRANCH=${BRANCH}
+    ports:
+      - "80:80"
+    env_file:
+      - path: .env
+        required: true
+
+  worker:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+      args:
+        - REPO=${REPO}
+        - BRANCH=${BRANCH}
+    env_file:
+      - path: .env
+        required: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

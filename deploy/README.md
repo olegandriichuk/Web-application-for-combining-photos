@@ -1,0 +1,65 @@
+# Deploy
+
+Multi-stage Docker setup: FastAPI serves both the REST API and the Vue SPA on port 80. The GPU worker runs in a separate container.
+
+## Prerequisites
+
+- Docker + Docker Compose v2
+- NVIDIA Container Toolkit (for the worker only)
+
+## Setup
+
+```bash
+cd deploy
+cp .env.example .env
+# Edit .env — fill in DATABASE_URL, REDIS_URL, SECRET_KEY, AWS credentials
+```
+
+## Commands
+
+```bash
+./update.sh app-build      # build app image (clones repo + Exposea, builds frontend)
+./update.sh app-up         # start app container
+./update.sh app-down       # stop everything
+
+./update.sh worker-build   # build worker image
+./update.sh worker-up      # start worker (requires NVIDIA GPU)
+./update.sh worker-down    # stop worker
+
+./update.sh logs           # follow logs for all containers
+./update.sh ps             # show container status
+```
+
+## Verification
+
+### Local (WSL2 + Docker Desktop)
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) with WSL2 backend
+2. Install [NVIDIA Container Toolkit for WSL2](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+3. `./update.sh app-build && ./update.sh app-up`
+4. `curl http://localhost/health` → `{"ok":true}`
+5. Open `http://localhost` — Vue SPA loads, register/login works
+
+### GPU Server (production)
+1. Install Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+2. Clone the repo and `cd deploy`
+3. `cp .env.example .env` and fill in values
+4. `./update.sh app-build && ./update.sh app-up`
+5. `curl http://localhost/health` → `{"ok":true}`
+6. `./update.sh worker-build && ./update.sh worker-up`
+7. Submit a stitch job from the UI; `./update.sh logs` to watch the worker process it
+
+## Architecture
+
+```
+Browser → :80 → app container (FastAPI)
+  ├── /api/*   → FastAPI routers
+  ├── /health  → health check
+  └── /*       → Vue SPA (served from /app/static)
+
+worker container (GPU)
+  └── python -m app.worker → Exposea CLI via subprocess
+
+External:
+  ├── PostgreSQL (Neon / Supabase)
+  └── Redis (Upstash)
+```
