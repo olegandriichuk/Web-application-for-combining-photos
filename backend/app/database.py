@@ -9,14 +9,13 @@ from .config import settings
 DATABASE_URL = settings.database_url
 
 engine = create_async_engine(
-    DATABASE_URL,
+    DATABASE_URL.split("?")[0],  # strip query params — ssl handled via connect_args
     future=True,
     echo=False,
     pool_pre_ping=True,   # reconnect if Neon closes idle connections
     pool_size=20,         # handle many concurrent tile requests
     max_overflow=20,
-    # SQLite: poolclass=NullPool — ensures a fresh connection per request for SQLite
-    # poolclass=NullPool,
+    connect_args={"ssl": True},  # required for Neon and other cloud PostgreSQL
 )
 
 class Base(DeclarativeBase):
