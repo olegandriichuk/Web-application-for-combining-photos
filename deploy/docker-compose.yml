@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile
       target: app
       args:
-        - REPO=${REPO}
-        - BRANCH=${BRANCH}
+        - REPO
+        - BRANCH
     ports:
       - "80:80"
     env_file:
@@ -21,8 +21,8 @@ services:
       dockerfile: Dockerfile
       target: worker
       args:
-        - REPO=${REPO}
-        - BRANCH=${BRANCH}
+        - REPO
+        - BRANCH
     env_file:
       - path: .env
         required: true
