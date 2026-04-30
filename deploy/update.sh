@@ -4,10 +4,17 @@ set -euo pipefail
 CMD="${1:-}"
 
 case "$CMD" in
+  up)
+    docker compose -f ./docker-compose.yml up -d ;;
+  down)
+    docker compose -f ./docker-compose.yml down ;;
+  build)
+    docker compose -f ./docker-compose.yml build --no-cache ;;
+
   app-up)
     docker compose -f ./docker-compose.yml up -d app ;;
   app-down)
-    docker compose -f ./docker-compose.yml down ;;
+    docker compose -f ./docker-compose.yml stop app ;;
   app-build)
     docker compose -f ./docker-compose.yml build --no-cache app ;;
 
@@ -26,8 +33,9 @@ case "$CMD" in
   *)
     echo "Usage: $0 <command>"
     echo ""
-    echo "  app-up / app-down / app-build           production app"
-    echo "  worker-up / worker-down / worker-build  stitch worker (GPU)"
+    echo "  up / down / build                       all services"
+    echo "  app-up / app-down / app-build           app only"
+    echo "  worker-up / worker-down / worker-build  worker only (GPU)"
     echo "  logs                                    follow all logs"
     echo "  ps                                      container status"
     exit 1 ;;
