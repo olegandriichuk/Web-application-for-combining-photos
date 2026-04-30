@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .routers import photos, auth, projects, stitch_jobs, project_members
@@ -41,4 +42,11 @@ async def health():
 # Serve Vue SPA from /app/static when running in Docker (not present in dev)
 _static = Path("/app/static")
 if _static.is_dir():
-    app.mount("/", StaticFiles(directory=str(_static), html=True), name="static")
+    app.mount("/assets", StaticFiles(directory=str(_static / "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str) -> FileResponse:
+        file_path = _static / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_static / "index.html"))
