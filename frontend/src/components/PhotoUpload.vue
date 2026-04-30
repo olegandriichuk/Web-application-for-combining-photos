@@ -1,4 +1,5 @@
 <template>
+  <div class="flex flex-col shrink-0 w-[260px]">
   <label
     class="w-full rounded-[14px] border-2 border-[#4954E7] bg-[rgba(73,84,231,0.05)] px-8 py-[81px] flex flex-col items-center justify-center cursor-pointer transition hover:bg-[rgba(73,84,231,0.09)] hover:shadow-[0_14px_30px_rgba(73,84,231,0.12)]"
     :class="{
@@ -42,6 +43,7 @@
       <div class="text-[12px] text-[#64748b]">Select some images (JPG, PNG, etc.)</div>
     </div>
   </label>
+  </div>
 </template>
 
 <script setup lang="ts">
