@@ -65,9 +65,7 @@
           @upload="uploadFiles"
         />
       </div>
-      <div v-if="error" class="mt-3 text-[13px] text-[#ef4444] font-semibold bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] px-3 py-[10px] rounded-xl">
-        {{ error }}
-      </div>
+      <p v-if="error" class="m-0 mt-2 text-[11px] text-[#ef4444]">{{ error }}</p>
     </div>
 
     <!-- Stitch section -->
