@@ -88,9 +88,8 @@ onMounted(async () => {
 
   const tileScale = Math.pow(2, max_zoom)
 
-  // ВАЖЛИВО:
-  // bounds треба будувати по повній tile grid, а не по raw image width/height.
-  // Інакше крайній правий/нижній tile існує, але карта обрізається раніше.
+  // Bounds must be built from the full tile grid, not raw image width/height.
+  // Otherwise the rightmost/bottom tile exists but the map clips before reaching it.
   const cols = Math.ceil(width / TILE_SIZE)
   const rows = Math.ceil(height / TILE_SIZE)
   const gridWidth = cols * TILE_SIZE
@@ -104,8 +103,7 @@ onMounted(async () => {
     [0, coordW],
   ]
 
-  // Невеликий запас, щоб край можна було комфортно досягнути на max zoom,
-  // але не витягнути карту занадто далеко за межі екрана.
+  // Small padding so the edge is reachable at max zoom without pulling the map too far off-screen.
   const viewW = mapContainer.value.clientWidth
   const viewH = mapContainer.value.clientHeight
   const padW = viewW / (2 * tileScale)
