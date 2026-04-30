@@ -168,17 +168,43 @@ const refresh = async () => {
 
 const uploadFiles = async (files: File[]) => {
   if (!files.length) return
-  isLoading.value = true
   error.value = null
+
+  const MAX_FILE_SIZE = 12 * 1024 * 1024
+  let validFiles = files.filter(f => f.size <= MAX_FILE_SIZE)
+  const oversized = files.filter(f => f.size > MAX_FILE_SIZE)
+
+  if (oversized.length > 0) {
+    if (oversized.length === 1) {
+      const f = oversized[0]!
+      const sizeMB = (f.size / 1024 / 1024).toFixed(1)
+      error.value = `File '${f.name}' is too large (${sizeMB} MB). Maximum allowed size is 12 MB.`
+    } else {
+      const msgs = oversized.map(f => `'${f.name}' (${(f.size / 1024 / 1024).toFixed(1)} MB)`).join(', ')
+      error.value = `Files exceed 12 MB limit and were skipped: ${msgs}.`
+    }
+    if (!validFiles.length) return
+  }
+
+  const MAX_PHOTOS = 50
+  const available = MAX_PHOTOS - photos.value.length
+  if (validFiles.length > available) {
+    const msg = 'You can upload a maximum of 50 photos per project.'
+    error.value = error.value ? `${error.value} ${msg}` : msg
+    validFiles = validFiles.slice(0, Math.max(0, available))
+    if (!validFiles.length) return
+  }
+
+  isLoading.value = true
   uploadProgress.value = 0
   try {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i]!
       await apiUploadPhoto(projectId.value, file, (event) => {
         const fileProgress = (event.lengthComputable && event.total) ? event.loaded / event.total : 0
-        uploadProgress.value = Math.round((i + fileProgress) / files.length * 100)
+        uploadProgress.value = Math.round((i + fileProgress) / validFiles.length * 100)
       })
-      uploadProgress.value = Math.round((i + 1) / files.length * 100)
+      uploadProgress.value = Math.round((i + 1) / validFiles.length * 100)
     }
     await refresh()
   } catch (e: any) {

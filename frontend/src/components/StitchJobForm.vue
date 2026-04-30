@@ -194,6 +194,12 @@
       </div>
     </div>
 
+    <!-- 400 Mpx warning -->
+    <div v-if="outputResWarning" class="flex items-start gap-2 px-3 py-[10px] rounded-[10px] bg-[rgba(234,179,8,0.08)] border border-[rgba(234,179,8,0.3)] text-[#92400e] text-[12px]">
+      <span class="shrink-0 font-bold">⚠</span>
+      <span>Warning: Output resolution exceeds 400 Mpx. This may cause very long processing times or run out of memory. Please reduce the width or height.</span>
+    </div>
+
     <!-- Image Point Selector + Corner Points: unified two-column block -->
     <div class="rounded-[12px] border border-[rgba(15,23,42,0.12)] bg-[rgba(248,250,252,0.5)] p-4">
       <div class="grid grid-cols-2 gap-5 items-start">
@@ -250,7 +256,7 @@
             />
           </div>
         </div>
-        <p class="m-0 text-[11px] text-[#94a3b8]">Corner coordinates [x, y] of the reference image (non-negative numbers)</p>
+        <p class="m-0 text-[11px] text-[#94a3b8]">Corner coordinates [x, y] of the reference image (non-negative numbers). The selected region must form a rectangle.</p>
         <p v-if="attempted && !cornerPointsValid" class="m-0 text-[11px] text-[#ef4444]">All coordinates must be non-negative numbers</p>
       </div>
 
@@ -356,6 +362,10 @@ const attempted = ref(false)
 const expNameOver = computed(() => form.exp_name.length > EXP_NAME_MAX)
 const heightInvalid = computed(() => isNaN(form.final_res_height) || form.final_res_height <= 0)
 const widthInvalid = computed(() => isNaN(form.final_res_width) || form.final_res_width <= 0)
+const outputResWarning = computed(() =>
+  !heightInvalid.value && !widthInvalid.value &&
+  form.final_res_height * form.final_res_width > 400_000_000
+)
 const coordInvalid = (val: number) => isNaN(val) || val < 0
 const cornerPointsValid = computed(() =>
   form.corner_points.every(p => !coordInvalid(p[0]) && !coordInvalid(p[1]))
