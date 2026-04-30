@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col">
     <label
-      class="h-[524px] w-full rounded-[14px] border-2 border-[#4954E7] bg-[rgba(73,84,231,0.05)] px-8 flex flex-col cursor-pointer transition hover:bg-[rgba(73,84,231,0.09)] hover:shadow-[0_14px_30px_rgba(73,84,231,0.12)]"
+      class="h-[524px] w-full rounded-[14px] border-2 border-[#4954E7] bg-[rgba(73,84,231,0.05)] px-8 flex flex-col overflow-hidden cursor-pointer transition hover:bg-[rgba(73,84,231,0.09)] hover:shadow-[0_14px_30px_rgba(73,84,231,0.12)]"
       :class="{
         'cursor-not-allowed opacity-80': isLoading,
         'bg-[rgba(73,84,231,0.12)] shadow-[0_18px_36px_rgba(73,84,231,0.15)]': isDragActive
