@@ -61,10 +61,12 @@
         <PhotoUpload
           :is-loading="isLoading || isDeleting"
           :is-deleting="isDeleting"
-          :error="error"
           :upload-progress="uploadProgress"
           @upload="uploadFiles"
         />
+      </div>
+      <div v-if="error" class="mt-3 text-[13px] text-[#ef4444] font-semibold bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] px-3 py-[10px] rounded-xl">
+        {{ error }}
       </div>
     </div>
 
