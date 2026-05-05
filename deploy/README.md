@@ -2,10 +2,93 @@
 
 Multi-stage Docker setup: FastAPI serves both the REST API and the Vue SPA on port 80. The GPU worker runs in a separate container with its own CUDA base image.
 
-## Prerequisites
+## Server Setup Checklist
 
-- Docker + Docker Compose v2
-- NVIDIA Container Toolkit (for the worker only)
+Everything required on a GPU server before the first build.
+
+### 1. Docker
+
+```bash
+docker --version
+docker compose version
+```
+
+If not installed:
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+### 2. NVIDIA Driver
+
+Required only for the `worker` container. The `app` container does not use the GPU.
+
+```bash
+nvidia-smi
+```
+
+Should print GPU name, driver version, and CUDA version. If the command is not found, install the NVIDIA driver for your OS.
+
+### 3. NVIDIA Container Toolkit
+
+The bridge between Docker and the GPU driver. Without it the container cannot see the GPU even if the driver is installed. Required only on the machine that runs the `worker` container.
+
+```bash
+# Add NVIDIA GPG key
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+# Add repository
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+# Install
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+
+# Restart Docker to pick up the toolkit
+sudo systemctl restart docker
+```
+
+Verify:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+```
+
+If `nvidia-smi` runs successfully inside the container, the setup is complete.
+
+### 4. WSL2 memory (local Windows machine only)
+
+ML models require ~10 GB RAM. WSL2 defaults to 2 GB — increase it before running the worker:
+
+```powershell
+# Run in PowerShell on the Windows host
+Set-Content -Path "$env:USERPROFILE\.wslconfig" -Value "[wsl2]`nmemory=12GB`nswap=4GB"
+wsl --shutdown
+```
+
+Verify in the WSL terminal:
+
+```bash
+free -h
+# Mem: should show ~12Gi
+```
+
+### 5. Pre-build checks
+
+```bash
+# Docker is running
+docker ps
+
+# GPU is accessible from Docker
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+
+# Enough disk space (images take ~15–20 GB)
+df -h
+```
 
 ## Setup
 
@@ -77,7 +160,7 @@ Browser → :80 → app container (FastAPI, python:3.10-slim)
   ├── /health   → health check
   └── /*        → Vue SPA index.html (SPA routing fallback)
 
-worker container (nvidia/cuda:12.1.1, GPU)
+worker container (python:3.11-slim, GPU via pip CUDA wheels)
   └── python -m app.worker → Exposea CLI via subprocess
 
 External:
