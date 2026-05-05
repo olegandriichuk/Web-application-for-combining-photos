@@ -35,6 +35,14 @@ Should print GPU name, driver version, and CUDA version. If the command is not f
 
 The bridge between Docker and the GPU driver. Without it the container cannot see the GPU even if the driver is installed. Required only on the machine that runs the `worker` container.
 
+Check your OS before choosing the installation path:
+
+```bash
+cat /etc/os-release
+```
+
+**Ubuntu/Debian (apt)**
+
 ```bash
 # Add NVIDIA GPG key
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
@@ -49,6 +57,20 @@ curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-contai
 sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
 
 # Restart Docker to pick up the toolkit
+sudo systemctl restart docker
+```
+
+**RHEL/CentOS/Oracle Linux (dnf)**
+
+```bash
+# Add repository
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
+  | sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+
+# Install
+sudo dnf install -y nvidia-container-toolkit
+
+# Restart Docker
 sudo systemctl restart docker
 ```
 
