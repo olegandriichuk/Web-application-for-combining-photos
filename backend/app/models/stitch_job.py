@@ -1,3 +1,6 @@
+# Author: Oleg Andriichuk, xandri07
+# Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base

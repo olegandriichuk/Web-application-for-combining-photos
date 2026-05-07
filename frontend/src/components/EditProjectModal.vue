@@ -1,3 +1,6 @@
+// Author: Oleg Andriichuk, xandri07
+// Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 <template>
   <Teleport to="body">
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="emit('cancel')">

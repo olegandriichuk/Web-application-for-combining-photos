@@ -1,3 +1,6 @@
+// Author: Oleg Andriichuk, xandri07
+// Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 <template>
   <!-- Loading / error -->
   <div v-if="isLoading" class="py-3 px-4 rounded-md text-sm text-center mb-4 bg-[#eff6ff] text-[#1d4ed8]">Loading projects…</div>

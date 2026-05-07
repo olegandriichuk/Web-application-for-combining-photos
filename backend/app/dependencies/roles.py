@@ -1,3 +1,6 @@
+# Author: Oleg Andriichuk, xandri07
+# Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 from typing import Tuple
 from fastapi import Depends, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession

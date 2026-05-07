@@ -1,3 +1,6 @@
+// Author: Oleg Andriichuk, xandri07
+// Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 export type PresetName = "p_100mpx" | "p_200mpx" | "p_400mpx";
 
 export type SaveFormat = "jp2" | "j2k" | "tiff" | "tif";

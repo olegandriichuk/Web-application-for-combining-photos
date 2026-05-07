@@ -1,3 +1,6 @@
+# Author: Oleg Andriichuk, xandri07
+# Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional

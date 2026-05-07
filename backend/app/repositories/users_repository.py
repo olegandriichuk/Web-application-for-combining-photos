@@ -1,3 +1,6 @@
+# Author: Oleg Andriichuk, xandri07
+# Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ..models.user import User

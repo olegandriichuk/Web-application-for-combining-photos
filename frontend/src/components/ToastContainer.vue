@@ -1,3 +1,6 @@
+// Author: Oleg Andriichuk, xandri07
+// Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 <template>
   <Teleport to="body">
     <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">

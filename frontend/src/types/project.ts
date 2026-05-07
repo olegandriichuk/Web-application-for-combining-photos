@@ -1,3 +1,6 @@
+// Author: Oleg Andriichuk, xandri07
+// Bachelor's thesis - Web Application for Image Stitching, FIT VUT Brno, 2026
+
 export type ProjectRole = 'owner' | 'editor' | 'viewer'
 
 export type DocumentType = 'Map' | 'Aerial photo' | 'Technical drawing' | 'Plan' | 'Other'
