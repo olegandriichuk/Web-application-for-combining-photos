@@ -23,14 +23,14 @@ class Settings(BaseSettings):
     # AWS S3 Configuration
     aws_access_key_id: str
     aws_secret_access_key: str
-    aws_region: str = "eu-north-1"
+    aws_region: str
     s3_bucket_name: str
 
     # Optional: for local development with localstack
     aws_endpoint_url: str | None = None
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./app.db"
+    database_url: str
 
     # Redis Configuration (optional - set redis_enabled=true to use)
     redis_enabled: bool = False
