@@ -30,7 +30,7 @@ config = context.config
 # hardcoded SQLite path is ignored in Docker / production.
 _db_url = os.environ.get("DATABASE_URL")
 if _db_url:
-    config.set_main_option("sqlalchemy.url", _db_url)
+    config.set_main_option("sqlalchemy.url", _db_url.split("?")[0])
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -65,10 +65,13 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
+    url = config.get_main_option("sqlalchemy.url") or ""
+    connect_args = {"ssl": True} if url.startswith("postgresql") else {}
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,  # NullPool is correct for short-lived migration runs
+        connect_args=connect_args, 
     )
 
     async with connectable.connect() as connection:
