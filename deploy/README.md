@@ -64,7 +64,7 @@ cd deploy && cp .env.example .env
 | Variable | Description |
 |---|---|
 | `SECRET_KEY` | JWT signing secret (generate with: `openssl rand -hex 32`) |
-| `DATABASE_URL` | PostgreSQL connection string (e.g. Neon, Supabase) |
+| `DATABASE_URL` | PostgreSQL connection string using `postgresql+asyncpg://` scheme (e.g. `postgresql+asyncpg://user:password@host/dbname?ssl=require`). Providers: [Neon](https://neon.tech), [Supabase](https://supabase.com) |
 | `REDIS_URL` | Redis connection string (e.g. Upstash) |
 | `AWS_ACCESS_KEY_ID` | AWS credentials for S3 |
 | `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 |
